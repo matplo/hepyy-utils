@@ -7,3 +7,7 @@ build/
 *.egg-info/
 outputs/
 .DS_Store
+
+# Local session-resume scratch files (not project content)
+resume.sh
+claude_resume.sh
