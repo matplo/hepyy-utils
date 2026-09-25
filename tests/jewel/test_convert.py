@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from heppyyier_utils.jewel.convert import RootBuffers, _write_root, const_subtraction_event
+from hepyy_utils.jewel.convert import RootBuffers, _write_root, const_subtraction_event
 
 
 def test_write_root_creates_tracks_tree(tmp_path):

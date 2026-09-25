@@ -1,4 +1,4 @@
-from heppyyier_utils.jewel.params import set_param_text
+from hepyy_utils.jewel.params import set_param_text
 
 
 def test_set_param_replaces_first_active_occurrence_and_drops_duplicates():

@@ -1,7 +1,7 @@
 """Pythia8 truth-flavor helpers for jet studies.
 
 The functions in this module are intentionally library-first: they do not
-import Pythia8, FastJet, cppyy, or heppyyier at module import time.
+import Pythia8, FastJet, cppyy, or hepyy at module import time.
 """
 
 from __future__ import annotations

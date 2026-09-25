@@ -3,8 +3,8 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from heppyyier_utils.jewel.cli import prepare
-from heppyyier_utils.jewel.workflow import prepare_runs
+from hepyy_utils.jewel.cli import prepare
+from hepyy_utils.jewel.workflow import prepare_runs
 
 
 def test_prepare_runs_writes_namespaced_medium_and_vacuum_dirs(tmp_path):
