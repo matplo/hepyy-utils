@@ -122,7 +122,7 @@ def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
 
     resolved = max(candidates, key=_jewel_version_key)
     return str(resolved), (
-        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH"
+        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH ({resolved})"
     )
 
 

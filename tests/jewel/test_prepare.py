@@ -101,7 +101,7 @@ def test_prepare_runs_raises_when_no_matching_executable_exists(tmp_path, monkey
     monkeypatch.setenv("PATH", "")
 
     with pytest.raises(FileNotFoundError, match=r"jewel-2\.4\.0-vac"):
-        prepare_runs(samples="vacuum", tag="missing", out_dir=tmp_path)
+        prepare_runs(samples="vacuum", tag="missing", out_dir=tmp_path, vacuum_bin="jewel-2.4.0-vac")
 
 
 def test_console_entry_names_are_jewel_prefixed():
