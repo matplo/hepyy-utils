@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-from heppyyier_utils.pythia import (
+from hepyy_utils.pythia import (
     PythiaConfig,
     PythiaConfigError,
     PythiaInitializationError,

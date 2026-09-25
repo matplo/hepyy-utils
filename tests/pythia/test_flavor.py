@@ -3,7 +3,7 @@ import types
 
 import pytest
 
-from heppyyier_utils.pythia.flavor import (
+from hepyy_utils.pythia.flavor import (
     FlavorLabel,
     append_ghosts,
     classify_pdg_id,

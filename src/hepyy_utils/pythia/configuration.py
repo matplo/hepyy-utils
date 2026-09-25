@@ -444,24 +444,24 @@ def create_pythia(
 ) -> Any:
     """Create, configure, and optionally initialize a ``pythia8.Pythia`` object.
 
-    Set ``load=True`` to call ``heppyyier.load("pythia8")`` before importing
+    Set ``load=True`` to call ``hepyy.load("pythia8")`` before importing
     the ``pythia8`` module. The default assumes module loading or an earlier
-    ``heppyyier.load("pythia8")`` already made it importable.
+    ``hepyy.load("pythia8")`` already made it importable.
     """
 
     if load:
         try:
-            import heppyyier
+            import hepyy
         except ImportError as exc:
-            raise ImportError("load=True requires the heppyyier Python package") from exc
-        heppyyier.load("pythia8")
+            raise ImportError("load=True requires the hepyy Python package") from exc
+        hepyy.load("pythia8")
 
     try:
         pythia8 = importlib.import_module("pythia8")
     except ImportError as exc:
         raise ImportError(
             "pythia8 is not importable. Load it first with a module command, "
-            "call heppyyier.load('pythia8'), or pass load=True."
+            "call hepyy.load('pythia8'), or pass load=True."
         ) from exc
 
     pythia = pythia8.Pythia()

@@ -56,7 +56,7 @@ def resolve_samples(selection: str) -> list[str]:
 def _template_text(name: str, template_dir: str | Path | None = None) -> str:
     if template_dir is not None:
         return (Path(template_dir).expanduser().resolve() / name).read_text()
-    return resources.files("heppyyier_utils.jewel.templates").joinpath(name).read_text()
+    return resources.files("hepyy_utils.jewel.templates").joinpath(name).read_text()
 
 
 def _write_template(name: str, destination: Path, template_dir: str | Path | None = None) -> None:

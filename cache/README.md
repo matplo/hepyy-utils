@@ -1,6 +1,6 @@
 # Artifact Cache
 
-`heppyyier_utils.cache` provides small, generator-neutral helpers for local
+`hepyy_utils.cache` provides small, generator-neutral helpers for local
 analysis caches. It is meant to avoid repeating expensive event generation,
 jet finding, or table construction when only later analysis or plotting steps
 change.
@@ -24,7 +24,7 @@ and whether pickle is acceptable for that workflow.
 ## Basic Usage
 
 ```python
-from heppyyier_utils.cache import ArtifactCache
+from hepyy_utils.cache import ArtifactCache
 
 CACHE_SCHEMA_VERSION = 1
 

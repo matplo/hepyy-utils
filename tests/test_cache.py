@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from heppyyier_utils.cache import ArtifactCache, config_digest, jsonable, safe_token
+from hepyy_utils.cache import ArtifactCache, config_digest, jsonable, safe_token
 
 
 @dataclass(frozen=True)

@@ -1,20 +1,20 @@
 """Demo: Pythia8 event generation plus FastJet anti-kt jet finding.
 
-Run after installing/loading the relevant heppyyier packages, for example:
+Run after installing/loading the relevant hepyy packages, for example:
 
-    heppyyier install fastjet pythia8 heppyyier-utils
+    hepyy install fastjet pythia8 hepyy-utils
     python examples/demo_pythia_fastjet.py
 
 If the packages are already shell-loaded with module load, the explicit
-heppyyier.load calls below are harmless.
+hepyy.load calls below are harmless.
 """
 
-import heppyyier
+import hepyy
 
-from heppyyier_utils.pythia import PythiaConfig, create_pythia
+from hepyy_utils.pythia import PythiaConfig, create_pythia
 
 
-heppyyier.load("fastjet")
+hepyy.load("fastjet")
 config = PythiaConfig.pp_hard_qcd(ecm=13000.0, pthat_min=20.0)
 pythia = create_pythia(config, load=True)
 
