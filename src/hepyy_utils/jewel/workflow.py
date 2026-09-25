@@ -113,7 +113,7 @@ def _resolve_executable(requested: str, pattern: str) -> str:
     warnings.warn(
         f"requested JEWEL executable {requested!r} was not found; using {resolved!r} from PATH",
         RuntimeWarning,
-        stacklevel=2,
+        stacklevel=5,
     )
     return resolved
 

@@ -73,7 +73,7 @@ def test_prepare_runs_keeps_requested_executable_when_present(tmp_path, monkeypa
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        prepared = prepare_runs(samples="medium", tag="direct", out_dir=tmp_path)
+        prepared = prepare_runs(samples="medium", tag="direct", out_dir=tmp_path, medium_bin="jewel-2.4.0-simple")
 
     assert not caught
     manifest = yaml.safe_load(prepared[0].manifest_path.read_text())
