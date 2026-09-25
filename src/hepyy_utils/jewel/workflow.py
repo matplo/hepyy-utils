@@ -85,7 +85,9 @@ def _sample_executable_pattern(sample: str) -> str:
 
 def _jewel_version_key(name: str) -> tuple[tuple[tuple[int, int | str], ...], str]:
     match = re.fullmatch(r"jewel-(.+)-(?:simple|vac)", Path(name).name)
-    version = match.group(1) if match else Path(name).name
+    if match is None:
+        raise ValueError(f"invalid JEWEL executable name: {name!r}")
+    version = match.group(1)
     parts = re.findall(r"\d+|[A-Za-z]+", version)
     return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in parts), Path(name).name
 
@@ -120,7 +122,7 @@ def _resolve_executable(requested: str, pattern: str) -> str:
 
 
 def _warning_stacklevel() -> int:
-    stacklevel = 1
+    stacklevel = 2
     frame = inspect.currentframe()
     try:
         frame = None if frame is None else frame.f_back

@@ -88,7 +88,7 @@ def test_prepare_runs_falls_back_to_latest_matching_executable(tmp_path, monkeyp
     monkeypatch.setenv("PATH", str(bindir))
 
     with pytest.warns(RuntimeWarning, match=r"jewel-2\.4\.0-vac.*jewel-2\.10\.0-vac"):
-        prepared = prepare_runs(samples="vacuum", tag="fallback", out_dir=tmp_path)
+        prepared = prepare_runs(samples="vacuum", tag="fallback", out_dir=tmp_path, vacuum_bin="jewel-2.4.0-vac")
 
     manifest = yaml.safe_load(prepared[0].manifest_path.read_text())
     assert manifest["executable"] == "jewel-2.10.0-vac"
