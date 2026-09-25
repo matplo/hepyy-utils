@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import importlib.resources as resources
+import os
+import re
 import shutil
 import subprocess
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +78,51 @@ def _sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> str:
     return medium_bin if sample == MEDIUM_SAMPLE else vacuum_bin
 
 
+def _sample_executable_pattern(sample: str) -> str:
+    return "jewel-*-simple" if sample == MEDIUM_SAMPLE else "jewel-*-vac"
+
+
+def _jewel_version_key(name: str) -> tuple[tuple[tuple[int, int | str], ...], str]:
+    match = re.fullmatch(r"jewel-(.+)-(?:simple|vac)", Path(name).name)
+    version = match.group(1) if match else Path(name).name
+    parts = re.findall(r"\d+|[A-Za-z]+", version)
+    return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in parts), Path(name).name
+
+
+def _resolve_executable(requested: str, pattern: str) -> str:
+    if shutil.which(requested) is not None:
+        return requested
+
+    candidates: set[str] = set()
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry:
+            continue
+        directory = Path(entry).expanduser()
+        if not directory.is_dir():
+            continue
+        for path in directory.glob(pattern):
+            if path.is_file() and os.access(path, os.X_OK):
+                candidates.add(path.name)
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"requested JEWEL executable {requested!r} was not found and no executables matching {pattern!r} were found in PATH"
+        )
+
+    resolved = max(candidates, key=_jewel_version_key)
+    warnings.warn(
+        f"requested JEWEL executable {requested!r} was not found; using {resolved!r} from PATH",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    return resolved
+
+
+def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> str:
+    requested = _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
+    return _resolve_executable(requested, _sample_executable_pattern(sample))
+
+
 def _sample_template(sample: str) -> str:
     return "params.PbPb.template.dat" if sample == MEDIUM_SAMPLE else "params.pp.template.dat"
 
@@ -141,13 +189,14 @@ def prepare_sample(
 
     params_path = run_dir / "params.dat"
     params_path.write_text(params_text)
+    executable = _resolved_sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
 
     manifest = {
         "schema_version": 1,
         "sample": sample,
         "kind": _sample_kind(sample),
         "tag": tag,
-        "executable": _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin),
+        "executable": executable,
         "params": "params.dat",
         "hepmc": hepmc_rel,
         "root": root_rel,
