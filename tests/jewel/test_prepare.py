@@ -77,7 +77,7 @@ def test_prepare_runs_keeps_requested_executable_when_present(tmp_path, monkeypa
 
     assert not caught
     manifest = yaml.safe_load(prepared[0].manifest_path.read_text())
-    assert manifest["executable"] == "jewel-2.4.0-simple"
+    assert manifest["executable"] == str((bindir / "jewel-2.4.0-simple").resolve())
 
 
 def test_prepare_runs_falls_back_to_latest_matching_executable(tmp_path, monkeypatch):

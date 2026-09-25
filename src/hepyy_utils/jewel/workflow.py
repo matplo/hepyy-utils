@@ -97,8 +97,9 @@ def _jewel_version_key(path: str | Path) -> tuple[tuple[tuple[int, int | str], .
 
 
 def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
-    if shutil.which(requested) is not None:
-        return requested, None
+    direct_path = shutil.which(requested)
+    if direct_path is not None:
+        return str(Path(direct_path).resolve()), None
 
     candidates: list[Path] = []
     seen: set[Path] = set()
