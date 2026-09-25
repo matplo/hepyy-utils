@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.resources as resources
+import inspect
 import os
 import re
 import shutil
@@ -113,9 +114,22 @@ def _resolve_executable(requested: str, pattern: str) -> str:
     warnings.warn(
         f"requested JEWEL executable {requested!r} was not found; using {resolved!r} from PATH",
         RuntimeWarning,
-        stacklevel=5,
+        stacklevel=_warning_stacklevel(),
     )
     return resolved
+
+
+def _warning_stacklevel() -> int:
+    stacklevel = 1
+    frame = inspect.currentframe()
+    try:
+        frame = None if frame is None else frame.f_back
+        while frame is not None and frame.f_globals.get("__name__") == __name__:
+            stacklevel += 1
+            frame = frame.f_back
+    finally:
+        del frame
+    return stacklevel
 
 
 def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> str:

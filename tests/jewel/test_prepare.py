@@ -9,6 +9,13 @@ from hepyy_utils.jewel.cli import prepare
 from hepyy_utils.jewel.workflow import prepare_runs
 
 
+def _make_executable(directory: Path, name: str) -> Path:
+    path = directory / name
+    path.write_text("#!/bin/sh\nexit 0\n")
+    path.chmod(path.stat().st_mode | 0o111)
+    return path
+
+
 def test_prepare_runs_writes_namespaced_medium_and_vacuum_dirs(tmp_path, monkeypatch):
     bindir = tmp_path / "bin"
     bindir.mkdir()
@@ -55,13 +62,6 @@ def test_prepare_cli_creates_vacuum_only(tmp_path, monkeypatch):
     assert (tmp_path / "cli" / "jewel_vac" / "params.dat").is_file()
     assert not (tmp_path / "cli" / "jewel_med").exists()
     assert "NEVENT 2" in (tmp_path / "cli" / "jewel_vac" / "params.dat").read_text()
-
-
-def _make_executable(directory: Path, name: str) -> Path:
-    path = directory / name
-    path.write_text("#!/bin/sh\nexit 0\n")
-    path.chmod(path.stat().st_mode | 0o111)
-    return path
 
 
 def test_prepare_runs_keeps_requested_executable_when_present(tmp_path, monkeypatch):
