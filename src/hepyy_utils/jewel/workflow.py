@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.resources as resources
-import inspect
 import os
 import re
 import shutil
@@ -97,9 +96,9 @@ def _jewel_version_key(path: str | Path) -> tuple[tuple[tuple[int, int | str], .
     return _version_tokens(release), 1 if not prerelease else 0, _version_tokens(prerelease), candidate.name, str(candidate)
 
 
-def _resolve_executable(requested: str, pattern: str) -> str:
+def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
     if shutil.which(requested) is not None:
-        return requested
+        return requested, None
 
     candidates: list[Path] = []
     seen: set[Path] = set()
@@ -122,28 +121,12 @@ def _resolve_executable(requested: str, pattern: str) -> str:
         )
 
     resolved = max(candidates, key=_jewel_version_key)
-    warnings.warn(
-        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH",
-        RuntimeWarning,
-        stacklevel=_warning_stacklevel(),
+    return str(resolved), (
+        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH"
     )
-    return str(resolved)
 
 
-def _warning_stacklevel() -> int:
-    stacklevel = 2
-    frame = inspect.currentframe()
-    try:
-        frame = None if frame is None else frame.f_back
-        while frame is not None and frame.f_globals.get("__name__") == __name__:
-            stacklevel += 1
-            frame = frame.f_back
-    finally:
-        del frame
-    return stacklevel
-
-
-def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> str:
+def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> tuple[str, str | None]:
     requested = _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
     return _resolve_executable(requested, _sample_executable_pattern(sample))
 
@@ -214,7 +197,9 @@ def prepare_sample(
 
     params_path = run_dir / "params.dat"
     params_path.write_text(params_text)
-    executable = _resolved_sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
+    executable, warning_message = _resolved_sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
+    if warning_message is not None:
+        warnings.warn(warning_message, RuntimeWarning, stacklevel=2)
 
     manifest = {
         "schema_version": 1,
