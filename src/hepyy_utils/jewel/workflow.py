@@ -83,20 +83,26 @@ def _sample_executable_pattern(sample: str) -> str:
     return "jewel-*-simple" if sample == MEDIUM_SAMPLE else "jewel-*-vac"
 
 
-def _jewel_version_key(name: str) -> tuple[tuple[tuple[int, int | str], ...], str]:
-    match = re.fullmatch(r"jewel-(.+)-(?:simple|vac)", Path(name).name)
+def _version_tokens(text: str) -> tuple[tuple[int, int | str], ...]:
+    return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in re.findall(r"\d+|[A-Za-z]+", text))
+
+
+def _jewel_version_key(path: str | Path) -> tuple[tuple[tuple[int, int | str], ...], int, tuple[tuple[int, int | str], ...], str, str]:
+    candidate = Path(path)
+    match = re.fullmatch(r"jewel-(.+)-(?:simple|vac)", candidate.name)
     if match is None:
-        raise ValueError(f"invalid JEWEL executable name: {name!r}")
+        raise ValueError(f"invalid JEWEL executable name: {candidate.name!r}")
     version = match.group(1)
-    parts = re.findall(r"\d+|[A-Za-z]+", version)
-    return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in parts), Path(name).name
+    release, _, prerelease = version.partition("-")
+    return _version_tokens(release), 1 if not prerelease else 0, _version_tokens(prerelease), candidate.name, str(candidate)
 
 
 def _resolve_executable(requested: str, pattern: str) -> str:
     if shutil.which(requested) is not None:
         return requested
 
-    candidates: set[str] = set()
+    candidates: list[Path] = []
+    seen: set[Path] = set()
     for entry in os.environ.get("PATH", "").split(os.pathsep):
         if not entry:
             continue
@@ -105,7 +111,10 @@ def _resolve_executable(requested: str, pattern: str) -> str:
             continue
         for path in directory.glob(pattern):
             if path.is_file() and os.access(path, os.X_OK):
-                candidates.add(path.name)
+                resolved_path = path.resolve()
+                if resolved_path not in seen:
+                    seen.add(resolved_path)
+                    candidates.append(resolved_path)
 
     if not candidates:
         raise FileNotFoundError(
@@ -114,11 +123,11 @@ def _resolve_executable(requested: str, pattern: str) -> str:
 
     resolved = max(candidates, key=_jewel_version_key)
     warnings.warn(
-        f"requested JEWEL executable {requested!r} was not found; using {resolved!r} from PATH",
+        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH",
         RuntimeWarning,
         stacklevel=_warning_stacklevel(),
     )
-    return resolved
+    return str(resolved)
 
 
 def _warning_stacklevel() -> int:

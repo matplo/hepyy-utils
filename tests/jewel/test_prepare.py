@@ -91,7 +91,7 @@ def test_prepare_runs_falls_back_to_latest_matching_executable(tmp_path, monkeyp
         prepared = prepare_runs(samples="vacuum", tag="fallback", out_dir=tmp_path, vacuum_bin="jewel-2.4.0-vac")
 
     manifest = yaml.safe_load(prepared[0].manifest_path.read_text())
-    assert manifest["executable"] == "jewel-2.10.0-vac"
+    assert manifest["executable"] == str((bindir / "jewel-2.10.0-vac").resolve())
 
 
 def test_prepare_runs_raises_when_no_matching_executable_exists(tmp_path, monkeypatch):
