@@ -1,4 +1,4 @@
-"""Pythia8 configuration helpers for heppyyier-managed workflows."""
+"""Pythia8 configuration helpers for hepyy-managed workflows."""
 
 from .configuration import (
     PythiaConfig,
