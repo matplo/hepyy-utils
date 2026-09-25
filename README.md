@@ -1,16 +1,16 @@
-# heppyyier-utils
+# hepyy-utils
 
 Workflow utilities for HEP event generators and tools installed with
-[heppyyier](https://github.com/matplo/heppyyier).
+[hepyy](https://github.com/matplo/hepyy).
 
 The repository is organized by generator/tool namespace. JEWEL utilities live
-under `heppyyier_utils.jewel`, Pythia8 helpers live under
-`heppyyier_utils.pythia`, and all JEWEL command-line entry points use a
+under `hepyy_utils.jewel`, Pythia8 helpers live under
+`hepyy_utils.pythia`, and all JEWEL command-line entry points use a
 `jewel_` prefix so future utilities for other generators can coexist cleanly.
 
 ## Artifact Caching
 
-`heppyyier_utils.cache` provides generator-neutral helpers for local analysis
+`hepyy_utils.cache` provides generator-neutral helpers for local analysis
 caches: JSON-safe config normalization, deterministic config hashes, compact
 filename tokens, pickle payload read/write, and JSON sidecars.
 See [cache/README.md](cache/README.md) for usage patterns, invalidation
@@ -18,22 +18,22 @@ guidelines, sidecar conventions, and pickle portability caveats.
 
 ## Pythia8
 
-`heppyyier_utils.pythia` provides a small library-first layer for building and
+`hepyy_utils.pythia` provides a small library-first layer for building and
 applying common Pythia8 settings. It does not import Pythia8, cppyy, or
-heppyyier at package import time, so the utility package remains installable
+hepyy at package import time, so the utility package remains installable
 without the generator stack loaded.
 
 Install/load Pythia8 separately when you want to run generation:
 
 ```bash
-heppyyier install pythia8 fastjet heppyyier-utils
-module load pythia8 fastjet heppyyier-utils
+hepyy install pythia8 fastjet hepyy-utils
+module load pythia8 fastjet hepyy-utils
 ```
 
 Create a standard pp hard-QCD setup with a dataclass:
 
 ```python
-from heppyyier_utils.pythia import PythiaConfig, create_pythia
+from hepyy_utils.pythia import PythiaConfig, create_pythia
 
 config = PythiaConfig.pp_hard_qcd(ecm=13000.0, pthat_min=20.0)
 pythia = create_pythia(config)
@@ -42,7 +42,7 @@ pythia = create_pythia(config)
 The same helper accepts dictionaries:
 
 ```python
-from heppyyier_utils.pythia import create_pythia
+from hepyy_utils.pythia import create_pythia
 
 pythia = create_pythia({
     "ecm": 13000.0,
@@ -73,7 +73,7 @@ the utility:
 ```python
 import argparse
 
-from heppyyier_utils.pythia import add_pythia_args, create_pythia
+from hepyy_utils.pythia import add_pythia_args, create_pythia
 
 parser = argparse.ArgumentParser()
 add_pythia_args(parser)
@@ -87,7 +87,7 @@ legacy `--pythiaopts` option. Extra settings are applied last so they can
 override generated defaults.
 
 If Pythia8 is not already importable through a shell module, pass `load=True`
-to call `heppyyier.load("pythia8")` before creating the generator:
+to call `hepyy.load("pythia8")` before creating the generator:
 
 ```python
 pythia = create_pythia(config, load=True)
@@ -97,14 +97,14 @@ A local FastJet example is provided at `examples/demo_pythia_fastjet.py`.
 
 ### Pythia Flavor Tagging
 
-`heppyyier_utils.pythia.flavor` provides reusable truth-flavor helpers for
+`hepyy_utils.pythia.flavor` provides reusable truth-flavor helpers for
 Pythia/FastJet workflows. The helpers are importable without Pythia8 or FastJet
 loaded; runtime objects are passed in by the caller.
 
 Hard-parton matching works at hadron and parton level:
 
 ```python
-from heppyyier_utils.pythia.flavor import extract_hard_partons, tag_jet_by_hard_parton
+from hepyy_utils.pythia.flavor import extract_hard_partons, tag_jet_by_hard_parton
 
 partons = extract_hard_partons(pythia.event)
 tag = tag_jet_by_hard_parton(jet, partons, match_radius=0.3)
@@ -117,7 +117,7 @@ matching radius is always caller-configurable through `match_radius`.
 Heavy-hadron ghost tagging is also available for hadron-level events:
 
 ```python
-from heppyyier_utils.pythia.flavor import (
+from hepyy_utils.pythia.flavor import (
     append_ghosts,
     make_heavy_hadron_ghosts,
     tag_jet_by_heavy_hadron_ghosts,
@@ -149,19 +149,19 @@ The utilities are split into four commands:
 Install the utility package:
 
 ```bash
-heppyyier recipe update
-heppyyier install heppyyier-utils
-module load heppyyier-utils
+hepyy recipe update
+hepyy install hepyy-utils
+module load hepyy-utils
 ```
 
-`heppyyier-utils` itself does not hard-depend on JEWEL. This keeps the package
+`hepyy-utils` itself does not hard-depend on JEWEL. This keeps the package
 installable for future non-JEWEL utilities; only the `jewel_` commands require
 JEWEL/LHAPDF at runtime.
 
 For JEWEL production, install/load the generator stack separately:
 
 ```bash
-heppyyier install jewel lhapdf
+hepyy install jewel lhapdf
 module load jewel lhapdf
 ```
 
@@ -258,7 +258,7 @@ executable, parameter file, HepMC output, ROOT output, logs, and PDF set names.
 `jewel_prepare --help`:
 
 ```text
-Usage: python -m heppyyier_utils.jewel.cli prepare [OPTIONS]
+Usage: python -m hepyy_utils.jewel.cli prepare [OPTIONS]
 
   Prepare self-contained JEWEL run directories.
 
@@ -289,7 +289,7 @@ Options:
 `jewel_run --help`:
 
 ```text
-Usage: python -m heppyyier_utils.jewel.cli run [OPTIONS] RUN_PATH
+Usage: python -m hepyy_utils.jewel.cli run [OPTIONS] RUN_PATH
 
   Run prepared JEWEL sample directories from manifests.
 
@@ -303,7 +303,7 @@ Options:
 `jewel_convert --help`:
 
 ```text
-Usage: python -m heppyyier_utils.jewel.cli convert [OPTIONS] INPUT_HEPMC
+Usage: python -m hepyy_utils.jewel.cli convert [OPTIONS] INPUT_HEPMC
                                                    OUTPUT_ROOT
 
   Convert HepMC to ROOT track TTrees using uproot.
@@ -327,7 +327,7 @@ Options:
 `jewel_pipeline --help`:
 
 ```text
-Usage: python -m heppyyier_utils.jewel.cli pipeline [OPTIONS]
+Usage: python -m hepyy_utils.jewel.cli pipeline [OPTIONS]
 
   Prepare and run JEWEL, optionally converting HepMC to ROOT.
 
