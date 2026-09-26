@@ -20,12 +20,15 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+parquet = ["pyarrow"]
+fast = ["numba"]
 
 [project.scripts]
 jewel_prepare = "hepyy_utils.jewel.cli:prepare_main"
 jewel_run = "hepyy_utils.jewel.cli:run_main"
 jewel_convert = "hepyy_utils.jewel.cli:convert_main"
 jewel_pipeline = "hepyy_utils.jewel.cli:pipeline_main"
+jewel_tables = "hepyy_utils.jewel.cli:tables_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
