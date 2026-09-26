@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import importlib.resources as resources
+import os
+import re
 import shutil
 import subprocess
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +78,60 @@ def _sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> str:
     return medium_bin if sample == MEDIUM_SAMPLE else vacuum_bin
 
 
+def _sample_executable_pattern(sample: str) -> str:
+    return "jewel-*-simple" if sample == MEDIUM_SAMPLE else "jewel-*-vac"
+
+
+def _version_tokens(text: str) -> tuple[tuple[int, int | str], ...]:
+    return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in re.findall(r"\d+|[A-Za-z]+", text))
+
+
+def _jewel_version_key(path: str | Path) -> tuple[tuple[tuple[int, int | str], ...], int, tuple[tuple[int, int | str], ...], str, str]:
+    candidate = Path(path)
+    match = re.fullmatch(r"jewel-(.+)-(?:simple|vac)", candidate.name)
+    if match is None:
+        raise ValueError(f"invalid JEWEL executable name: {candidate.name!r}")
+    version = match.group(1)
+    release, _, prerelease = version.partition("-")
+    return _version_tokens(release), 1 if not prerelease else 0, _version_tokens(prerelease), candidate.name, str(candidate)
+
+
+def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
+    direct_path = shutil.which(requested)
+    if direct_path is not None:
+        return str(Path(direct_path).resolve()), None
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry:
+            continue
+        directory = Path(entry).expanduser()
+        if not directory.is_dir():
+            continue
+        for path in directory.glob(pattern):
+            if path.is_file() and os.access(path, os.X_OK):
+                resolved_path = path.resolve()
+                if resolved_path not in seen:
+                    seen.add(resolved_path)
+                    candidates.append(resolved_path)
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"requested JEWEL executable {requested!r} was not found and no executables matching {pattern!r} were found in PATH"
+        )
+
+    resolved = max(candidates, key=_jewel_version_key)
+    return str(resolved), (
+        f"requested JEWEL executable {requested!r} was not found; using {resolved.name!r} from PATH ({resolved})"
+    )
+
+
+def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> tuple[str, str | None]:
+    requested = _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
+    return _resolve_executable(requested, _sample_executable_pattern(sample))
+
+
 def _sample_template(sample: str) -> str:
     return "params.PbPb.template.dat" if sample == MEDIUM_SAMPLE else "params.pp.template.dat"
 
@@ -141,13 +198,16 @@ def prepare_sample(
 
     params_path = run_dir / "params.dat"
     params_path.write_text(params_text)
+    executable, warning_message = _resolved_sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
+    if warning_message is not None:
+        warnings.warn(warning_message, RuntimeWarning, stacklevel=2)
 
     manifest = {
         "schema_version": 1,
         "sample": sample,
         "kind": _sample_kind(sample),
         "tag": tag,
-        "executable": _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin),
+        "executable": executable,
         "params": "params.dat",
         "hepmc": hepmc_rel,
         "root": root_rel,
