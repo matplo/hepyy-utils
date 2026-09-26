@@ -19,8 +19,8 @@ def _make_executable(directory: Path, name: str) -> Path:
 def test_prepare_runs_writes_namespaced_medium_and_vacuum_dirs(tmp_path, monkeypatch):
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    _make_executable(bindir, "jewel-2.4.0-simple")
-    _make_executable(bindir, "jewel-2.4.0-vac")
+    _make_executable(bindir, "jewel-2.6.0-simple")
+    _make_executable(bindir, "jewel-2.6.0-vac")
     monkeypatch.setenv("PATH", str(bindir))
     prepared = prepare_runs(
         samples="both",
@@ -51,7 +51,7 @@ def test_prepare_runs_writes_namespaced_medium_and_vacuum_dirs(tmp_path, monkeyp
 def test_prepare_cli_creates_vacuum_only(tmp_path, monkeypatch):
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    _make_executable(bindir, "jewel-2.4.0-vac")
+    _make_executable(bindir, "jewel-2.6.0-vac")
     monkeypatch.setenv("PATH", str(bindir))
     result = CliRunner().invoke(
         prepare,

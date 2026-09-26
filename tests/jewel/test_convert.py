@@ -23,7 +23,7 @@ def test_write_root_creates_tracks_tree(tmp_path):
     with uproot.open(output) as root_file:
         arrays = root_file["tracks"].arrays(library="np")
         names = arrays.keys() if hasattr(arrays, "keys") else arrays.dtype.names
-        assert set(names) == {"eventID", "label", "px", "py", "pz", "energy"}
+        assert set(names) == {"eventID", "label", "px", "py", "pz", "energy", "tag"}
         assert arrays["eventID"].tolist() == [0, 0]
         assert arrays["label"].tolist() == [211, -211]
         info = root_file["event_info"].arrays(library="np")
