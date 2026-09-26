@@ -19,6 +19,11 @@ KEEPRECOILS T
 WRITESCATCEN T
 # to write out dummy particles (needed for 4MomSub subtraction)
 WRITEDUMMIES T
+# JEWEL 2.6.0 colour coherence (these are the 2.6.0 defaults: coherence ON).
+# Coherence OFF: PCOHREJ 0 and COHSCAT F. Older JEWEL versions ignore these keys.
+PCOHREJ 1
+COHSCAT T
+COHLENGTHFAC 1
 # keep intermediate particles
 #SHORTHEPMC F
 #COMPRESS F

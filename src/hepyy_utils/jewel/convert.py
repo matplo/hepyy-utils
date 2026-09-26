@@ -19,6 +19,10 @@ event number, the two beam PDG ids (the pp/pn/np/nn isospin channel, each with i
 cross section in ``xsec``; JEWEL 2.6.0 writes 2212 for both beams and marks a neutron only by its
 mass, which ``subtraction.nucleon_pid`` reads) and the leftover thermal pT per event. The two beam
 records (status 4 in JEWEL 2.6.0, pT = 0) are removed before the subtraction.
+
+If the input has outgoing hard partons (status 23, from JEWEL patched with
+``patch_jewel_partons.py``), they are written to a ``partons`` tree (eventID, pid, px, py, pz,
+energy) that can be matched to the jets of the same eventID.
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ import numpy as np
 from . import subtraction
 
 CS_MODES = ("reference", "legacy")
+PARTON_STATUS = 23
 LEFTOVER_MODES = ("keep", "drop")
 
 
@@ -65,6 +70,12 @@ class RootBuffers:
     beam1_pid: list[int] = field(default_factory=list)
     beam2_pid: list[int] = field(default_factory=list)
     cs_left_pt: list[float] = field(default_factory=list)
+    parton_event_id: list[int] = field(default_factory=list)
+    parton_pid: list[int] = field(default_factory=list)
+    parton_px: list[float] = field(default_factory=list)
+    parton_py: list[float] = field(default_factory=list)
+    parton_pz: list[float] = field(default_factory=list)
+    parton_energy: list[float] = field(default_factory=list)
 
 
 def const_subtraction_event(parts: np.ndarray, ghosts: np.ndarray) -> list[tuple[float, float, float, float, int, int]]:
@@ -175,6 +186,20 @@ def _append_event_info(buffers: RootBuffers, event_id: int, event) -> None:
     buffers.beam1_pid.append(beams[0])
     buffers.beam2_pid.append(beams[1])
     buffers.cs_left_pt.append(math.nan)
+
+
+def _append_partons(buffers: RootBuffers, event_id: int, event) -> None:
+    """Outgoing hard partons (status 23) written by JEWEL patched with patch_jewel_partons.py."""
+
+    for particle in event.particles:
+        if int(particle.status) == PARTON_STATUS:
+            px, py, pz, energy = _momentum_components(particle.momentum)
+            buffers.parton_event_id.append(int(event_id))
+            buffers.parton_pid.append(int(particle.pid))
+            buffers.parton_px.append(px)
+            buffers.parton_py.append(py)
+            buffers.parton_pz.append(pz)
+            buffers.parton_energy.append(energy)
 
 
 def _kinematic_tuple(particle, list_id: int) -> tuple[float, float, float, float, int, int] | None:
@@ -293,6 +318,15 @@ def _write_root(
         root_file["tracks"] = tracks
         if settings is not None:
             root_file["jewel_cs"] = json.dumps(settings)
+        if buffers.parton_event_id:
+            root_file["partons"] = {
+                "eventID": np.asarray(buffers.parton_event_id, dtype=np.int64),
+                "pid": np.asarray(buffers.parton_pid, dtype=np.int32),
+                "px": np.asarray(buffers.parton_px, dtype=np.float64),
+                "py": np.asarray(buffers.parton_py, dtype=np.float64),
+                "pz": np.asarray(buffers.parton_pz, dtype=np.float64),
+                "energy": np.asarray(buffers.parton_energy, dtype=np.float64),
+            }
         if write_event_info:
             root_file["event_info"] = {
                 "eventID": np.asarray(buffers.info_event_id, dtype=np.int64),
@@ -356,6 +390,7 @@ def convert_hepmc_to_root(
                 break
             if write_event_info:
                 _append_event_info(buffers, event_count, event)
+            _append_partons(buffers, event_count, event)
             if subtract_4mom and cs_mode == "reference":
                 left_pt = _convert_event_with_reference_subtraction(
                     buffers, event_count, event, dRmax=dRmax, leftovers=leftovers, thermal_pid=thermal_pid, rng=rng

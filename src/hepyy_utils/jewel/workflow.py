@@ -153,8 +153,8 @@ def prepare_sample(
     ptmax: str | float | None = None,
     etamax: str | float | None = None,
     job_id: str | int | None = None,
-    medium_bin: str = "jewel-2.4.0-simple",
-    vacuum_bin: str = "jewel-2.4.0-vac",
+    medium_bin: str = "jewel-2.6.0-simple",
+    vacuum_bin: str = "jewel-2.6.0-vac",
     template_dir: str | Path | None = None,
 ) -> PreparedSample:
     """Prepare one self-contained JEWEL sample run directory."""
@@ -247,8 +247,8 @@ def prepare_runs(
     job_id: str | int | None = None,
     job_id_medium: str | int | None = None,
     job_id_vacuum: str | int | None = None,
-    medium_bin: str = "jewel-2.4.0-simple",
-    vacuum_bin: str = "jewel-2.4.0-vac",
+    medium_bin: str = "jewel-2.6.0-simple",
+    vacuum_bin: str = "jewel-2.6.0-vac",
     template_dir: str | Path | None = None,
 ) -> list[PreparedSample]:
     run_tag = tag or default_tag()

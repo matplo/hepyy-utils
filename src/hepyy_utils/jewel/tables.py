@@ -8,6 +8,9 @@ Per input file <stem>.hepmc[.gz] it writes (rows in event order, join on event_i
                  counts n_final/n_thermal/n_dummy/n_cs/n_raw, cs_thermal_pt, cs_left_pt
   particles      constituent-subtracted event (subtraction.subtract): event_id, px, py, pz, e, pid, tag
   particles_raw  raw record, HepMC status 1/3/4 (dummies included, beams removed): event_id, px, py, pz, e, pid, status
+  partons        outgoing hard partons, HepMC status 23, written by JEWEL patched with
+                 patch_jewel_partons.py (two per event, before the final-state shower):
+                 event_id, ipart, px, py, pz, e, pid. Written only when the input has them.
 Parquet: <stem>.events.parquet, <stem>.particles.parquet, ...  ROOT: <stem>.root with one TTree per table.
 
   jewel_tables run*.hepmc.gz [--format parquet|root|both] [--particles cs|raw|both]
@@ -18,8 +21,8 @@ Parquet: <stem>.events.parquet, <stem>.particles.parquet, ...  ROOT: <stem>.root
 reproducible: one generator per input file, seeded from (--seed, file name).
 The settings are stored with the output (parquet metadata key 'jewel_cs'; TObjString 'jewel_cs').
 
-pthat: taken from the HepMC event scale (E line). JEWEL 2.2.0 writes 0 there; this script then
-stores NaN. Writing PARI(17) (pT-hat) there is a one-line change in JEWEL's CONVERTTOHEPMC.
+pthat: taken from the HepMC event scale (E line). Stock JEWEL writes 0 there (stored as NaN);
+JEWEL patched with patch_jewel_partons.py writes PARI(17).
 """
 import gzip
 import json
@@ -37,7 +40,7 @@ H_KEYS = ("hi_n_hard", "hi_npart_proj", "hi_npart_targ", "hi_ncoll", "hi_nspec_n
           "hi_sigma_nn")
 F_KEYS = ("pdf_id1", "pdf_id2", "pdf_x1", "pdf_x2", "pdf_scale", "pdf_xf1", "pdf_xf2")
 INT_KEYS = {"event_id", "ievent", "n_mpi", "process_id", "n_final", "n_thermal", "n_dummy", "n_cs", "n_raw",
-            "beam1_pid", "beam2_pid"}
+            "beam1_pid", "beam2_pid", "n_partons"}
 
 
 def read_hepmc2(path):
@@ -125,7 +128,7 @@ def convert(path, a):
     rng = np.random.default_rng([a.seed, zlib.crc32(os.path.basename(path).encode())])
     out = Tables(stem, a.format, dict(source=os.path.basename(path), dRmax=a.dRmax,
                                       thermal_pid=a.thermal_pid, seed=a.seed, particles=a.particles))
-    buf = {"events": [], "particles": [], "particles_raw": []}
+    buf = {"events": [], "particles": [], "particles_raw": [], "partons": []}
     nev, t0 = 0, time.time()
 
     def flush():
@@ -144,6 +147,14 @@ def convert(path, a):
                   n_dummy=int(dummy.sum()),
                   cs_thermal_pt=float(np.hypot(p[:, 2], p[:, 3])[(st == 3) & good].sum()))
         eid = int(hdr["event_id"])
+        hard = st == 23
+        ev["n_partons"] = int(hard.sum())
+        if hard.any():
+            buf["partons"].append(dict(event_id=np.full(hard.sum(), eid, np.int64),
+                                       ipart=np.arange(hard.sum(), dtype=np.int8),
+                                       **{k: p[hard, c].astype(np.float64) for k, c in
+                                          zip(("px", "py", "pz", "e"), range(2, 6))},
+                                       pid=pid[hard].astype(np.int32)))
         if a.particles in ("cs", "both"):
             o = subtraction.subtract(st, pid, p[:, 2], p[:, 3], p[:, 4], p[:, 5], dRmax=a.dRmax,
                                    thermal_pid=a.thermal_pid, rng=rng)

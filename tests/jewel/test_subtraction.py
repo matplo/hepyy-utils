@@ -83,6 +83,9 @@ def _write_hepmc(path, n=8):
                 nucleon = pyhepmc.GenParticle((0, 0, sign * math.sqrt(2510**2 - mass**2), 2510), 2212, 4)
                 nucleon.generated_mass = mass
                 vertex.add_particle_in(nucleon)
+            # outgoing hard partons (status 23), as written by patch_jewel_partons.py
+            for sign, pid in ((1, 21), (-1, 2)):
+                vertex.add_particle_out(pyhepmc.GenParticle((sign * (100.0 + i), 0, 10.0, math.hypot(100.0 + i, 10.0)), pid, 23))
             for status, pid, count in ((1, 211, 30), (4, -211, 3), (3, 21, 20)):
                 for _ in range(count):
                     p4 = _p4(rng.exponential(2.0) + 0.2, rng.uniform(-2, 2), rng.uniform(-np.pi, np.pi), 0.14)
@@ -122,6 +125,15 @@ def test_root_reference_matches_tables_and_records_settings(tmp_path):
     assert list(zip(info["beam1_pid"], info["beam2_pid"])) == list(zip(events.beam1_pid, events.beam2_pid))
     assert set(zip(events.beam1_pid, events.beam2_pid)) == {(2212, 2212), (2212, 2112), (2112, 2212), (2112, 2112)}
     assert not np.any((np.hypot(tracks["px"], tracks["py"]) == 0) & (np.abs(tracks["pz"]) > 2000))  # no beams
+
+    with uproot.open(tmp_path / "ref.root") as f:
+        partons = f["partons"].arrays(library="np")
+    table = pq.read_table(tmp_path / "tab/run.partons.parquet").to_pandas()
+    assert partons["eventID"].tolist() == [e for e in range(8) for _ in range(2)]
+    assert partons["pid"].tolist() == [21, 2] * 8 and table.pid.tolist() == [21, 2] * 8
+    np.testing.assert_allclose(partons["px"], table.px)
+    assert events.n_partons.tolist() == [2] * 8
+    assert not np.any(np.isin(tracks["label"], [21, 2]))                 # partons are not tracks
 
     with uproot.open(tmp_path / "drop.root") as f:
         dropped = f["tracks"].arrays(library="np")

@@ -156,6 +156,11 @@ hepyy install hepyy-utils
 module load hepyy-utils
 ```
 
+The default executables are `jewel-2.6.0-simple` and `jewel-2.6.0-vac`
+(`--medium-bin`/`--vacuum-bin` select another version). JEWEL 2.6.0 runs with
+colour coherence ON by default; the PbPb template sets `PCOHREJ`, `COHSCAT` and
+`COHLENGTHFAC` explicitly (coherence OFF: `PCOHREJ 0`, `COHSCAT F`).
+
 `hepyy-utils` itself does not hard-depend on JEWEL. This keeps the package
 installable for future non-JEWEL utilities; only the `jewel_` commands require
 JEWEL/LHAPDF at runtime.
@@ -284,6 +289,34 @@ With JEWEL 2.6.0, keep `DOSUBTRACTION F` (the default) when you use these
 converters. With `DOSUBTRACTION T`, JEWEL subtracts internally and stops writing
 the scattering centres (status 3) that the converters need.
 
+### Outgoing hard partons
+
+Stock JEWEL does not write the hard-process partons. `tools/patch_jewel_partons.py`
+patches the JEWEL 2.6.0 source (short HepMC output, the default) so that each
+event also carries:
+
+- the two outgoing matrix-element partons, as HepMC status 23, taken after
+  PYTHIA's initial-state shower and before JEWEL's vacuum or medium final-state
+  shower (the same definition in `jewel-*-vac` and `jewel-*-simple`);
+- p̂_T (`PARI(17)`) in the event-scale field.
+
+The hepyy recipe `jewel/2.6.0-custom` applies this patch and installs
+`jewel-2.6.0-custom-simple` and `jewel-2.6.0-custom-vac` next to the stock
+binaries:
+
+```bash
+hepyy install jewel/2.6.0-custom
+jewel_prepare --tag partons --medium-bin jewel-2.6.0-custom-simple --vacuum-bin jewel-2.6.0-custom-vac
+```
+
+For a JEWEL built by hand, `python tools/patch_jewel_partons.py jewel-2.6.0.f
+jewel-2.6.0-partons.f` makes the same change; rebuild afterwards.
+
+Both converters then write the partons: `jewel_convert` as a `partons` tree
+(eventID, pid, px, py, pz, energy) and `jewel_tables` as `<stem>.partons`; the
+events table gets `pthat` and `n_partons`. Readers that select status 1, 3 and 4
+(Rivet, both converters) are unaffected by the extra records.
+
 ### Flat tables: `jewel_tables`
 
 `jewel_tables` writes the same subtraction as flat tables in parquet and/or
@@ -358,9 +391,9 @@ Options:
   --job-id-medium TEXT      Override NJOB for the medium/PbPb sample.
   --job-id-vacuum TEXT      Override NJOB for the vacuum/pp sample.
   --medium-bin TEXT         Medium JEWEL executable.  [default:
-                            jewel-2.4.0-simple]
+                            jewel-2.6.0-simple]
   --vacuum-bin TEXT         Vacuum JEWEL executable.  [default:
-                            jewel-2.4.0-vac]
+                            jewel-2.6.0-vac]
   --template-dir DIRECTORY  Directory with JEWEL template .dat files.
   -h, --help                Show this message and exit.
 ```
@@ -445,9 +478,9 @@ Options:
   --job-id-medium TEXT            Override NJOB for the medium/PbPb sample.
   --job-id-vacuum TEXT            Override NJOB for the vacuum/pp sample.
   --medium-bin TEXT               Medium JEWEL executable.  [default:
-                                  jewel-2.4.0-simple]
+                                  jewel-2.6.0-simple]
   --vacuum-bin TEXT               Vacuum JEWEL executable.  [default:
-                                  jewel-2.4.0-vac]
+                                  jewel-2.6.0-vac]
   --template-dir DIRECTORY        Directory with JEWEL template .dat files.
   --convert / --no-convert        Convert generated HepMC files to ROOT after
                                   running.  [default: no-convert]

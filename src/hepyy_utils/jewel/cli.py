@@ -37,8 +37,8 @@ def _cs_options(command):
 
 def _prepare_options(command):
     command = click.option("--template-dir", type=click.Path(file_okay=False), default=None, help="Directory with JEWEL template .dat files.")(command)
-    command = click.option("--vacuum-bin", default="jewel-2.4.0-vac", show_default=True, help="Vacuum JEWEL executable.")(command)
-    command = click.option("--medium-bin", default="jewel-2.4.0-simple", show_default=True, help="Medium JEWEL executable.")(command)
+    command = click.option("--vacuum-bin", default="jewel-2.6.0-vac", show_default=True, help="Vacuum JEWEL executable.")(command)
+    command = click.option("--medium-bin", default="jewel-2.6.0-simple", show_default=True, help="Medium JEWEL executable.")(command)
     command = click.option("--job-id-vacuum", default=None, help="Override NJOB for the vacuum/pp sample.")(command)
     command = click.option("--job-id-medium", default=None, help="Override NJOB for the medium/PbPb sample.")(command)
     command = click.option("--job-id", default=None, help="Override NJOB for both samples.")(command)
