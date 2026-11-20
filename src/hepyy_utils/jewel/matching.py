@@ -80,7 +80,10 @@ def require_fastjet():
     try:
         import fastjet
     except ImportError as exc:
-        raise RuntimeError("FastJet is required for JEWEL jet matching; install the fastjet Python package") from exc
+        raise RuntimeError(
+            "JEWEL jet matching requires FastJet. Load it with hepyy.load('fastjet') "
+            "or install the fastjet Python package."
+        ) from exc
     return fastjet
 
 
@@ -99,7 +102,13 @@ def cluster_final_jets(px, py, pz, e, radius=0.4, min_pt=0.0):
     if not len(vectors[0]):
         return []
 
-    particles = [fastjet.PseudoJet(*p4) for p4 in zip(*vectors)]
+    if hasattr(fastjet, "gbl"):
+        # The cppyy ClusterSequence constructor needs a typed C++ vector.
+        particles = fastjet.gbl.std.vector[fastjet.PseudoJet]()
+        for p4 in zip(*vectors):
+            particles.push_back(fastjet.PseudoJet(*p4))
+    else:
+        particles = [fastjet.PseudoJet(*p4) for p4 in zip(*vectors)]
     definition = fastjet.JetDefinition(fastjet.antikt_algorithm, radius)
     sequence = fastjet.ClusterSequence(particles, definition)
     jets = []

@@ -319,6 +319,10 @@ events table gets `pthat` and `n_partons`. Readers that select status 1, 3 and 4
 
 ### Production points, path lengths, and jet matching
 
+Runnable [Python and notebook examples](examples/README.md) show the full
+post-generation analysis using `hepyy.load("fastjet")`, thermal subtraction,
+matching before cuts, and inspection of the geometry/jet joins.
+
 Rebuild `jewel/2.6.0-custom` from the recipes containing `geometry-v1`, then
 prepare a run with the custom binaries explicitly selected:
 
@@ -376,10 +380,10 @@ pair known to come from the same run. IDs and weights alone cannot detect
 every accidentally swapped file, especially in long HepMC without status-23
 records.
 
-Parquet output requires `pyarrow`, and jet clustering requires the `fastjet`
-Python package. Install them in the Python environment that runs the utilities,
-or install both extras from a source checkout with
-`python -m pip install '.[parquet,jets]'`.
+Parquet output requires `pyarrow`. Jet clustering supports native FastJet
+loaded with `hepyy.load("fastjet")`, as demonstrated in the examples, or the
+standalone `fastjet` Python package. For the standalone binding, install both
+extras from a source checkout with `python -m pip install '.[parquet,jets]'`.
 
 ```bash
 jewel_tables outputs/jewel_events/geometry/jewel_med/events/*.hepmc \
