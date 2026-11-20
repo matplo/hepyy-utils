@@ -50,9 +50,8 @@ def _root_columns(tree, keys):
     return {key: tree[key].array(library="np").tolist() for key in keys}
 
 
-def test_reference_tables(reference_run, tmp_path):
+def test_reference_tables(reference_run, tmp_path, native_fastjet):
     pq = pytest.importorskip("pyarrow.parquet")
-    pytest.importorskip("fastjet")
     hepmc, run_id, event_ids, legs = reference_run
 
     convert_hepmc_to_tables(

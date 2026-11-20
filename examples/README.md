@@ -4,8 +4,9 @@
 [`jewel_geometry_analysis.ipynb`](jewel_geometry_analysis.ipynb) analyze saved
 JEWEL HepMC and geometry CSV files. They do not generate new events.
 
-Both examples explicitly use `hepyy.load("fastjet")` to load native FastJet
-through cppyy. Activate a hepyy environment with a working cppyy runtime and
+Both examples use the same loader as `jewel_tables`, which calls
+`hepyy.load("fastjet")` to load native FastJet through cppyy.
+Activate a hepyy environment with a working cppyy runtime and
 installed FastJet. If FastJet is missing, run `hepyy install fastjet`. See the
 [hepyy installation guide](https://github.com/matplo/hepyy#installation) for
 platform-specific runtime setup.
@@ -13,12 +14,11 @@ platform-specific runtime setup.
 From the `hepyy-utils` checkout, install the analysis dependencies:
 
 ```bash
-python -m pip install -e '.[parquet]' matplotlib jupyterlab
+python -m pip install -e '.[parquet,jets]' matplotlib jupyterlab
 ```
 
-These examples use native C++ FastJet through cppyy. Start a fresh Python
-process or notebook kernel and call `hepyy.load("fastjet")` before importing
-`fastjet`.
+The `jets` extra installs hepyy. FastJet itself is installed with
+`hepyy install fastjet` and loaded automatically when jet finding is requested.
 
 ## Run the Python example
 

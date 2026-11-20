@@ -6,23 +6,18 @@ Run after installing/loading the relevant hepyy packages, for example:
     python examples/demo_pythia_fastjet.py
 
 If the packages are already shell-loaded with module load, the explicit
-hepyy.load calls below are harmless.
+native loading below reuses the active packages.
 """
 
-import hepyy
-
+from hepyy_utils.fastjet import require_fastjet
 from hepyy_utils.pythia import PythiaConfig, create_pythia
 
 
-hepyy.load("fastjet")
+fastjet = require_fastjet()
 config = PythiaConfig.pp_hard_qcd(ecm=13000.0, pthat_min=20.0)
 pythia = create_pythia(config, load=True)
 
-import cppyy
-import fastjet
-
-
-PseudoJetVec = cppyy.gbl.std.vector[fastjet.PseudoJet]
+PseudoJetVec = fastjet.gbl.std.vector[fastjet.PseudoJet]
 
 jet_radius = 0.4
 pt_min = 20.0
