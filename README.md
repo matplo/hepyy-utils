@@ -317,6 +317,121 @@ Both converters then write the partons: `jewel_convert` as a `partons` tree
 events table gets `pthat` and `n_partons`. Readers that select status 1, 3 and 4
 (Rivet, both converters) are unaffected by the extra records.
 
+### Production points, path lengths, and jet matching
+
+Runnable [Python and notebook examples](examples/README.md) show the full
+post-generation analysis using `hepyy.load("fastjet")`, thermal subtraction,
+matching before cuts, and inspection of the geometry/jet joins.
+
+Rebuild `jewel/2.6.0-custom` from the recipes containing `geometry-v1`, then
+prepare a run with the custom binaries explicitly selected:
+
+```bash
+hepyy install jewel/2.6.0-custom --force
+module load jewel/2.6.0-custom
+jewel_prepare --tag geometry --geometry --geometry-step-fm 0.02 \
+  --medium-bin jewel-2.6.0-custom-perf-simple \
+  --vacuum-bin jewel-2.6.0-custom-perf-vac
+jewel_run outputs/jewel_events/geometry
+```
+
+For an unpublished local recipe, add
+`--recipe /path/to/hepyy-recipes/jewel/2.6.0-custom.yaml` to the install command.
+Install the updated utility checkout into the active Python environment with
+`python -m pip install -e '.[parquet,jets]'` from its repository directory.
+
+The run still needs the PDF sets selected by its cards. Geometry export is
+supported for `COLLIDER PPJJ` in both the medium and vacuum builds. It creates
+`<output>.hepmc.geometry.csv` alongside HepMC. The manifest records its unique
+run ID and integration step. A missing requested executable is an error when
+geometry is enabled; it cannot fall back to a different variant. Old custom
+binaries that do not produce the sidecar fail the output check. Existing
+sidecars are not overwritten; prepare a new run tag for another generation.
+
+The CSV has two rows per accepted HepMC event. `leg_id` 1/2 denotes the two
+primary hard legs, independently of the final leading/subleading jet order.
+Its fields include:
+
+- Shared `x0_fm,y0_fm,z0_fm,t0_fm`, actual `b_fm`, and `centrality` (fraction
+  0–1; vacuum uses -1).
+- `me_px,me_py,me_pz,me_e` from the matrix-element snapshot and `px,py,pz,e`
+  after JEWEL's virtuality setup. The latter define the reference path axes.
+- `L_geom_T_fm`: transverse distance to the finite nuclear-overlap boundary.
+- `L_hot_fm` and `L_hot_T_fm`: collision-frame three-dimensional and transverse distances
+  along that straight ray while JEWEL's evolving medium has positive
+  temperature, within its evolution time bound.
+- `int_T3_dl`: the corresponding temperature integral, in GeV³·fm.
+
+These are reference-path estimates, not a unique trajectory of a branching
+shower. The midpoint integration includes the initial temperature rise;
+`--geometry-step-fm` bounds coordinate-time steps in fm/c. Refine this step
+for convergence studies. Vacuum lengths/integrals are zero. The header
+records units, medium parameters, frame, and estimator version.
+
+Both converters discover an adjacent sidecar automatically, including for
+compressed `<output>.hepmc.gz`. Use `--geometry PATH` to supply a different
+sidecar for a single input. The complete event IDs, weights, and available
+matrix-element records are checked before converted geometry is published.
+`jewel_run` also seals the sidecar with a SHA-256 of the uncompressed HepMC
+file, which both converters verify. Sidecars from direct generator invocations
+have no digest until explicitly sealed with
+`hepyy_utils.jewel.geometry.seal_geometry(csv_path, hepmc_path)`. Only seal a
+pair known to come from the same run. IDs and weights alone cannot detect
+every accidentally swapped file, especially in long HepMC without status-23
+records.
+
+Parquet output requires `pyarrow`. Jet clustering supports native FastJet
+loaded with `hepyy.load("fastjet")`, as demonstrated in the examples, or the
+standalone `fastjet` Python package. For the standalone binding, install both
+extras from a source checkout with `python -m pip install '.[parquet,jets]'`.
+
+```bash
+jewel_tables outputs/jewel_events/geometry/jewel_med/events/*.hepmc \
+  --outdir tables --format both --particles both --jets \
+  --jet-radius 0.4 --jet-ptmin 20 --jet-eta-max 2 --match-delta-r 0.3
+```
+
+The output adds a `geometry` table and production geometry in `events`.
+With `--jets`, matching first uses **all positive-pT jets** clustered from the
+supplied final-state particles, without jet pT or eta analysis cuts. It
+maximizes the number of matches within `--match-delta-r`, then minimizes total
+distance in pseudorapidity/azimuth, with each jet assigned at most once.
+Only after these assignments are fixed are `--jet-ptmin` and `--jet-eta-max`
+applied. Changing those analysis cuts does not change the assignments.
+
+The additional tables are:
+
+- `jets_all`: the full clustered jet collection, with `analysis_selected`
+  indicating whether each jet passes the analysis cuts.
+- `jets`: the selected subset of `jets_all`.
+- `jet_matches`: one record per hard leg, with its assignment, matching
+  distance, ambiguity flag, candidate count, and `analysis_selected` flag.
+
+A matched jet that fails an analysis cut retains `matched=true`, its jet ID,
+and its matching distance, with `analysis_selected=false`. A genuinely
+unmatched leg has `matched=false`, `jet_id=-1`, and `analysis_selected=false`.
+Its geometric path estimate still exists independently of the jet matching.
+`jet_id` starts at zero; `jet_rank` starts at one in pT order over the full
+jet collection. No leading-jet/leg-1 assumption is made.
+
+Anti-kt clustering uses constituent-subtracted particles for `--particles cs`
+or `both`, including the reference subtraction's thermal leftovers. For
+`--particles raw` it uses final status 1/4 particles. Beams, dummy records,
+status-23 diagnostics, and neutrinos are excluded; raw thermal status-3
+records are not constituents. The jet definition is saved in output metadata.
+
+Join `geometry` to `jet_matches` on `(run_id,event_id,leg_id)` and the latter
+to `jets_all` on `(run_id,event_id,jet_id)` to retain every assignment. Select
+`analysis_selected=true` for the analysis, or join to `jets` for its selected
+subset. This assigns the matched hard leg's straight-ray path estimate to a
+jet; it does not trace ancestry or the actual branching shower trajectory.
+Flat constituent tables retain their
+per-file `event_id` schema; the run ID is also in each file's `jewel_cs`
+metadata. In the older `jewel_convert` ROOT layout, the geometry tree has
+both `event_id` (original HepMC number) and `eventID` (the zero-based ordinal
+used by `tracks`). `jewel_pipeline --geometry --convert` retains the geometry
+too; use `jewel_tables --jets` for automatic jet matching.
+
 ### Flat tables: `jewel_tables`
 
 `jewel_tables` writes the same subtraction as flat tables in parquet and/or
@@ -324,7 +439,8 @@ ROOT. Each input gives `<stem>.events` (one row per event) and
 `<stem>.particles` (the subtracted particles with `tag`), and optionally
 `<stem>.particles_raw` (status 1, 3 and 4 records). It needs `pyarrow` for
 parquet (`.[parquet]`). It reads the HepMC2 text directly and is faster than the
-pyhepmc path.
+pyhepmc path. Convert inputs with the same output stem into separate output
+directories.
 
 ```bash
 jewel_tables jewel_med_*.hepmc.gz --outdir tables/          # parquet, subtracted
@@ -395,6 +511,10 @@ Options:
   --vacuum-bin TEXT         Vacuum JEWEL executable.  [default:
                             jewel-2.6.0-vac]
   --template-dir DIRECTORY  Directory with JEWEL template .dat files.
+  --geometry                Export production points and reference path lengths.
+  --geometry-step-fm FLOAT RANGE
+                            Maximum time step (fm/c) for geometry path
+                            integration.  [default: 0.02; x>0.0]
   -h, --help                Show this message and exit.
 ```
 
@@ -433,6 +553,8 @@ Options:
                                   [default: progress]
   --event-info / --no-event-info  Write the event_info tree.  [default: event-
                                   info]
+  --geometry FILE                 Geometry CSV; otherwise discover
+                                  <input>.geometry.csv automatically.
   --cs-mode [reference|legacy]    Constituent subtraction: reference (Rivet
                                   SubtractedJewelEvent port) or legacy
                                   (earlier hepyy-utils algorithm).  [default:
@@ -482,6 +604,11 @@ Options:
   --vacuum-bin TEXT               Vacuum JEWEL executable.  [default:
                                   jewel-2.6.0-vac]
   --template-dir DIRECTORY        Directory with JEWEL template .dat files.
+  --geometry                      Export production points and reference path
+                                  lengths; requires a rebuilt custom JEWEL
+                                  binary.
+  --geometry-step-fm FLOAT RANGE  Maximum time step (fm/c) for geometry path
+                                  integration.  [default: 0.02; x>0.0]
   --convert / --no-convert        Convert generated HepMC files to ROOT after
                                   running.  [default: no-convert]
   --subtract-4mom-medium / --no-subtract-4mom-medium
@@ -534,6 +661,15 @@ Options:
                                   [default: 0]
   --chunk INTEGER                 Events per write.  [default: 5000]
   --double                        float64 momenta (JEWEL writes 6 digits).
+  --geometry FILE                 Geometry CSV for one input; otherwise
+                                  discover <input>.geometry.csv automatically.
+  --jets                          Cluster anti-kt jets and match them to
+                                  geometry legs (requires fastjet).
+  --jet-radius FLOAT RANGE        [default: 0.4; x>0.0]
+  --jet-ptmin FLOAT RANGE         Minimum jet pT in GeV.  [default: 20.0;
+                                  x>=0.0]
+  --jet-eta-max FLOAT RANGE       [default: 2.0; x>0.0]
+  --match-delta-r FLOAT RANGE     [default: 0.3; x>0.0]
   -h, --help                      Show this message and exit.
 ```
 

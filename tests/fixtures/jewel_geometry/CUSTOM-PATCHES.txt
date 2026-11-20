@@ -1,0 +1,17 @@
+JEWEL 2.6.0, custom patch set: partons-v1+geometry-v1+perf-v1
+stock sources        jewel-2.6.0.f   sha256 78b39f19513c3633c00d45b22f0803c0873a93d98a536d66efc9277255bf5b81
+                     medium-simple.f sha256 a5f5a16d984cf84d28c2c789f72557a64b85cb6ae51bc9f395b1f2a7f4e2bd38
+                     medium-vac.f sha256 c83fda6a0b81ce0dc9f524bbf9a3c68f0225f090107a5cd4d6711edad0b20ea0
+partons-only source  jewel-2.6.0.f   sha256 5ab26243f3512e6a345e6c12dd5d64e0213b5cd1815ad0141bd968142f204761
+custom sources       jewel-2.6.0.f   sha256 0ff7dab92339212757531de8b73724b9b3a078969454066163371b49ae39d846   (partons-v1+geometry-v1)
+                     medium-simple.f sha256 2b9058cf87f69b399260f1008438dcfed9c405307f507ef20d7952eb17899bbb
+                     medium-vac.f sha256 2c68ad776c128e020d6775c6e7d7f7689e92f80756515fc2c3b75e8366db4d18
+custom-perf sources  jewel-2.6.0.f   sha256 9f1a71144dcc6dd0aa6eda64e628f418490f1e88347e62e52eec930005cb458a   (partons-v1+geometry-v1+perf-v1)
+                     medium-simple.f sha256 1465c089bd94604034e3efa4662afcf1cf93342beab52523b4527cc08c100bd6
+                     medium-vac.f sha256 2c68ad776c128e020d6775c6e7d7f7689e92f80756515fc2c3b75e8366db4d18
+stock binaries:       jewel-2.6.0-simple jewel-2.6.0-vac
+custom binaries:      jewel-2.6.0-custom-simple jewel-2.6.0-custom-vac
+custom-perf binaries: jewel-2.6.0-custom-perf-simple jewel-2.6.0-custom-perf-vac
+patches: custom-partons.patch (outgoing hard partons as HepMC status 23; PARI(17) as event scale)
+         custom-geometry.patch (opt-in PPJJ production point and straight-ray medium exposure)
+         custom-perf.patch    (speed only: cached medium constants, stray flush removed)

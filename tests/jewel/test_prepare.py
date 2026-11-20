@@ -6,12 +6,13 @@ import yaml
 from click.testing import CliRunner
 
 from hepyy_utils.jewel.cli import prepare
-from hepyy_utils.jewel.workflow import prepare_runs
+from hepyy_utils.jewel.geometry import FIELDS, hepmc_digest
+from hepyy_utils.jewel.workflow import prepare_runs, run_manifest
 
 
-def _make_executable(directory: Path, name: str) -> Path:
+def _make_executable(directory: Path, name: str, body="exit 0\n") -> Path:
     path = directory / name
-    path.write_text("#!/bin/sh\nexit 0\n")
+    path.write_text("#!/bin/sh\n" + body)
     path.chmod(path.stat().st_mode | 0o111)
     return path
 
@@ -44,6 +45,8 @@ def test_prepare_runs_writes_namespaced_medium_and_vacuum_dirs(tmp_path, monkeyp
         manifest = yaml.safe_load(item.manifest_path.read_text())
         assert manifest["hepmc"] == f"events/{item.sample}_smoke.hepmc"
         assert manifest["root"] == f"roots/{item.sample}_smoke.root"
+        assert "geometry" not in manifest
+        assert item.geometry_path is None
 
     assert (tmp_path / "smoke" / "jewel_med" / "medium.params.dat").is_file()
 
@@ -102,6 +105,99 @@ def test_prepare_runs_raises_when_no_matching_executable_exists(tmp_path, monkey
 
     with pytest.raises(FileNotFoundError, match=r"jewel-2\.4\.0-vac"):
         prepare_runs(samples="vacuum", tag="missing", out_dir=tmp_path, vacuum_bin="jewel-2.4.0-vac")
+
+
+def test_geometry_requires_the_requested_executable(tmp_path, monkeypatch):
+    _make_executable(tmp_path, "jewel-2.6.0-vac")
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    with pytest.raises(FileNotFoundError, match=r"jewel-2\.6\.0-custom-vac.*geometry"):
+        prepare_runs(samples="vacuum", tag="missing", out_dir=tmp_path, geometry=True,
+                     vacuum_bin="jewel-2.6.0-custom-vac")
+    assert not (tmp_path / "missing").exists()
+
+
+@pytest.mark.parametrize("step", [0.0, -0.1, float("nan"), float("inf")])
+def test_geometry_prepare_rejects_invalid_step(tmp_path, step):
+    with pytest.raises(ValueError, match="step must be positive and finite"):
+        prepare_runs(samples="vacuum", tag="invalid", out_dir=tmp_path, geometry=True, geometry_step_fm=step)
+
+
+def test_geometry_manifests_namespace_sidecars_and_run_ids(tmp_path):
+    medium = _make_executable(tmp_path, "jewel-2.6.0-custom-simple")
+    vacuum = _make_executable(tmp_path, "jewel-2.6.0-custom-vac")
+    prepared = prepare_runs(samples="both", tag="geo", out_dir=tmp_path, geometry=True,
+                            medium_bin=str(medium), vacuum_bin=str(vacuum))
+    ids = set()
+    for item in prepared:
+        settings = yaml.safe_load(item.manifest_path.read_text())["geometry"]
+        assert settings["scheme"] == "jewel_geometry_v1"
+        assert settings["step_fm"] == 0.02
+        assert settings["path"] == f"events/{item.sample}_geo.hepmc.geometry.csv"
+        assert item.geometry_path == item.run_dir / settings["path"]
+        assert not item.geometry_path.exists()
+        ids.add(settings["run_id"])
+    assert len(ids) == 2
+
+
+def _fake_geometry_body(*, run_id='"$JEWEL_GEOMETRY_RUN_ID"', write_sidecar=True, extra_hepmc_event=False):
+    hepmc = "events/jewel_vac_geo.hepmc"
+    body = f"printf '%s\\n' 'E 1 -1 30 0 0 0 0 1 1 2 0 1 1' > {hepmc}\n"
+    if extra_hepmc_event:
+        body += f"printf '%s\\n' 'E 2 -1 30 0 0 0 0 1 1 2 0 1 1' >> {hepmc}\n"
+    if write_sidecar:
+        body += rf"""printf '# schema=jewel_geometry_v1\n# axis=shower_start\n# medium=vac\n# run_id=%s\n# step_fm=%s\n' {run_id} "$JEWEL_GEOMETRY_STEP_FM" > "$JEWEL_GEOMETRY_FILE"
+printf '%s\n' '{','.join(FIELDS)}' \
+  '1,1,21,1,0,0,0,0,0,0,30,0,0,30,28,0,0,28,0,0,0,0' \
+  '1,2,2,1,0,0,0,0,0,0,-30,0,0,30,-28,0,0,28,0,0,0,0' >> "$JEWEL_GEOMETRY_FILE"
+"""
+    return body
+
+
+def _prepare_fake_geometry(tmp_path, body):
+    executable = _make_executable(tmp_path, "jewel-2.6.0-custom-vac", body)
+    return prepare_runs(samples="vacuum", tag="geo", out_dir=tmp_path, geometry=True,
+                        vacuum_bin=str(executable), geometry_step_fm=0.05)[0]
+
+
+def test_run_geometry_passes_per_run_environment_and_refuses_stale_sidecar(tmp_path, monkeypatch):
+    run = _prepare_fake_geometry(tmp_path, _fake_geometry_body())
+    monkeypatch.setenv("JEWEL_GEOMETRY_FILE", str(tmp_path / "inherited.csv"))
+
+    result = run_manifest(run.manifest_path)
+
+    assert result["geometry"] == str(run.geometry_path)
+    assert run.geometry_path.read_text().startswith(f"# hepmc_sha256={hepmc_digest(run.hepmc_path)}\n")
+    assert not (tmp_path / "inherited.csv").exists()
+    first_bytes = run.geometry_path.read_bytes()
+    with pytest.raises(FileExistsError, match="geometry output already exists"):
+        run_manifest(run.manifest_path)
+    assert run.geometry_path.read_bytes() == first_bytes
+
+
+@pytest.mark.parametrize(("body", "error"), [
+    (_fake_geometry_body(write_sidecar=False), "geometry output missing"),
+    (_fake_geometry_body(run_id="wrong"), "run ID differs"),
+    (_fake_geometry_body(extra_hepmc_event=True), "expected geometry for HepMC event 2"),
+])
+def test_run_geometry_rejects_missing_or_mismatched_output(tmp_path, body, error):
+    run = _prepare_fake_geometry(tmp_path, body)
+
+    with pytest.raises(RuntimeError, match=error):
+        run_manifest(run.manifest_path, check_output=False)
+
+
+def test_ordinary_run_does_not_inherit_geometry_settings(tmp_path, monkeypatch):
+    executable = _make_executable(
+        tmp_path, "jewel-2.6.0-custom-vac",
+        'test -z "${JEWEL_GEOMETRY_FILE:-}${JEWEL_GEOMETRY_RUN_ID:-}${JEWEL_GEOMETRY_STEP_FM:-}"\n',
+    )
+    run = prepare_runs(samples="vacuum", tag="plain", out_dir=tmp_path, vacuum_bin=str(executable))[0]
+    monkeypatch.setenv("JEWEL_GEOMETRY_FILE", "inherited.csv")
+    monkeypatch.setenv("JEWEL_GEOMETRY_RUN_ID", "inherited")
+    monkeypatch.setenv("JEWEL_GEOMETRY_STEP_FM", "1")
+
+    assert "geometry" not in run_manifest(run.manifest_path, check_output=False)
 
 
 def test_console_entry_names_are_jewel_prefixed():
