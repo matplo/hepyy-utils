@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.resources as resources
+import math
 import os
 import re
 import shutil
@@ -12,14 +13,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
+from uuid import uuid4
 
 import yaml
 
+from .geometry import SCHEMA as GEOMETRY_SCHEME
+from .geometry import open_geometry, seal_geometry
 from .params import set_param_text
 
 
 MEDIUM_SAMPLE = "jewel_med"
 VACUUM_SAMPLE = "jewel_vac"
+DEFAULT_GEOMETRY_STEP_FM = 0.02
+GEOMETRY_ENV_VARS = ("JEWEL_GEOMETRY_FILE", "JEWEL_GEOMETRY_RUN_ID", "JEWEL_GEOMETRY_STEP_FM")
 
 SAMPLE_ALIASES = {
     "medium": [MEDIUM_SAMPLE],
@@ -42,6 +48,7 @@ class PreparedSample:
     manifest_path: Path
     hepmc_path: Path
     params_path: Path
+    geometry_path: Path | None = None
 
 
 def default_tag() -> str:
@@ -96,10 +103,12 @@ def _jewel_version_key(path: str | Path) -> tuple[tuple[tuple[int, int | str], .
     return _version_tokens(release), 1 if not prerelease else 0, _version_tokens(prerelease), candidate.name, str(candidate)
 
 
-def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
+def _resolve_executable(requested: str, pattern: str, *, geometry: bool = False) -> tuple[str, str | None]:
     direct_path = shutil.which(requested)
     if direct_path is not None:
         return str(Path(direct_path).resolve()), None
+    if geometry:
+        raise FileNotFoundError(f"requested JEWEL executable {requested!r} was not found for geometry export")
 
     candidates: list[Path] = []
     seen: set[Path] = set()
@@ -127,9 +136,11 @@ def _resolve_executable(requested: str, pattern: str) -> tuple[str, str | None]:
     )
 
 
-def _resolved_sample_executable(sample: str, medium_bin: str, vacuum_bin: str) -> tuple[str, str | None]:
+def _resolved_sample_executable(
+    sample: str, medium_bin: str, vacuum_bin: str, *, geometry: bool = False,
+) -> tuple[str, str | None]:
     requested = _sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
-    return _resolve_executable(requested, _sample_executable_pattern(sample))
+    return _resolve_executable(requested, _sample_executable_pattern(sample), geometry=geometry)
 
 
 def _sample_template(sample: str) -> str:
@@ -140,6 +151,13 @@ def _set_if_present(text: str, key: str, value: str | int | float | None) -> str
     if value is None or value == "":
         return text
     return set_param_text(text, key, value)
+
+
+def _geometry_step(value: float) -> float:
+    step = float(value)
+    if not math.isfinite(step) or step <= 0:
+        raise ValueError("geometry step must be positive and finite")
+    return step
 
 
 def prepare_sample(
@@ -156,20 +174,26 @@ def prepare_sample(
     medium_bin: str = "jewel-2.6.0-simple",
     vacuum_bin: str = "jewel-2.6.0-vac",
     template_dir: str | Path | None = None,
+    geometry: bool = False,
+    geometry_step_fm: float = DEFAULT_GEOMETRY_STEP_FM,
 ) -> PreparedSample:
     """Prepare one self-contained JEWEL sample run directory."""
 
     sample = sample.lower()
     if sample not in (MEDIUM_SAMPLE, VACUUM_SAMPLE):
         raise ValueError(f"prepare_sample expects canonical sample name, got {sample!r}")
+    if geometry:
+        geometry_step_fm = _geometry_step(geometry_step_fm)
 
     run_root = Path(out_dir).expanduser().resolve() / tag
     run_dir = run_root / sample
-    if run_dir.exists():
-        if clean:
-            shutil.rmtree(run_dir)
-        else:
-            raise FileExistsError(f"run directory exists: {run_dir}; use clean=True or a new tag")
+    if run_dir.exists() and not clean:
+        raise FileExistsError(f"run directory exists: {run_dir}; use clean=True or a new tag")
+    executable, warning_message = _resolved_sample_executable(
+        sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin, geometry=geometry,
+    )
+    if clean and run_dir.exists():
+        shutil.rmtree(run_dir)
 
     for rel in ("events", "logs", "splitint", "xsecs", "roots"):
         (run_dir / rel).mkdir(parents=True, exist_ok=True)
@@ -198,7 +222,6 @@ def prepare_sample(
 
     params_path = run_dir / "params.dat"
     params_path.write_text(params_text)
-    executable, warning_message = _resolved_sample_executable(sample, medium_bin=medium_bin, vacuum_bin=vacuum_bin)
     if warning_message is not None:
         warnings.warn(warning_message, RuntimeWarning, stacklevel=2)
 
@@ -220,6 +243,16 @@ def prepare_sample(
             "pbpb": {"name": "EPPS16nlo_CT14nlo_Pb208", "pdfset": 901300},
         },
     }
+    geometry_path = None
+    if geometry:
+        geometry_rel = f"{hepmc_rel}.geometry.csv"
+        geometry_path = run_dir / geometry_rel
+        manifest["geometry"] = {
+            "path": geometry_rel,
+            "run_id": uuid4().hex,
+            "step_fm": geometry_step_fm,
+            "scheme": GEOMETRY_SCHEME,
+        }
     manifest_path = run_dir / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False))
 
@@ -229,6 +262,7 @@ def prepare_sample(
         manifest_path=manifest_path,
         hepmc_path=run_dir / hepmc_rel,
         params_path=params_path,
+        geometry_path=geometry_path,
     )
 
 
@@ -250,6 +284,8 @@ def prepare_runs(
     medium_bin: str = "jewel-2.6.0-simple",
     vacuum_bin: str = "jewel-2.6.0-vac",
     template_dir: str | Path | None = None,
+    geometry: bool = False,
+    geometry_step_fm: float = DEFAULT_GEOMETRY_STEP_FM,
 ) -> list[PreparedSample]:
     run_tag = tag or default_tag()
     prepared: list[PreparedSample] = []
@@ -270,6 +306,8 @@ def prepare_runs(
                 medium_bin=medium_bin,
                 vacuum_bin=vacuum_bin,
                 template_dir=template_dir,
+                geometry=geometry,
+                geometry_step_fm=geometry_step_fm,
             )
         )
     return prepared
@@ -292,12 +330,49 @@ def manifest_paths(run_path: str | Path, samples: str = "both") -> list[Path]:
     return paths
 
 
+def _verify_geometry(geometry_path: Path, hepmc_path: Path, sample: str, run_id: str, step: float) -> None:
+    from .tables import iter_events_with_geometry
+
+    if not geometry_path.is_file():
+        raise RuntimeError(f"expected JEWEL geometry output missing: {geometry_path}; "
+                           "use an executable built with geometry export support")
+    expected_medium = "simple" if sample == MEDIUM_SAMPLE else "vac"
+    try:
+        with open_geometry(geometry_path) as (metadata, geometry_events):
+            if metadata["run_id"] != run_id:
+                raise ValueError("run ID differs from the manifest")
+            if metadata["medium"] != expected_medium:
+                raise ValueError("medium differs from the manifest sample")
+            if not math.isclose(metadata["step_fm"], step, rel_tol=1e-12):
+                raise ValueError("step size differs from the manifest")
+            for _ in iter_events_with_geometry(str(hepmc_path), geometry_events):
+                pass
+    except (OSError, ValueError, IndexError) as exc:
+        raise RuntimeError(f"invalid JEWEL geometry output {geometry_path}: {exc}") from exc
+
+
 def run_manifest(manifest_path: str | Path, *, check_output: bool = True) -> dict:
     manifest_path = Path(manifest_path).expanduser().resolve()
     manifest = load_manifest(manifest_path)
     run_dir = manifest_path.parent
     executable = manifest["executable"]
     params = manifest["params"]
+    env = os.environ.copy()
+    for variable in GEOMETRY_ENV_VARS:
+        env.pop(variable, None)
+    geometry = manifest.get("geometry")
+    geometry_path = None
+    if geometry is not None:
+        if geometry["scheme"] != GEOMETRY_SCHEME:
+            raise ValueError(f"unsupported JEWEL geometry scheme: {geometry['scheme']!r}")
+        run_id = geometry["run_id"]
+        if not isinstance(run_id, str) or re.fullmatch(r"[0-9a-f]{32}", run_id) is None:
+            raise ValueError("JEWEL geometry run ID must be 32 lowercase hexadecimal characters")
+        step = _geometry_step(geometry["step_fm"])
+        geometry_path = run_dir / geometry["path"]
+        if geometry_path.exists() or geometry_path.is_symlink():
+            raise FileExistsError(f"JEWEL geometry output already exists: {geometry_path}; prepare a new run tag")
+        env.update(zip(GEOMETRY_ENV_VARS, (str(geometry_path), run_id, str(step))))
     stdout_path = run_dir / manifest["stdout"]
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -305,6 +380,7 @@ def run_manifest(manifest_path: str | Path, *, check_output: bool = True) -> dic
         process = subprocess.Popen(
             [executable, params],
             cwd=run_dir,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -323,12 +399,17 @@ def run_manifest(manifest_path: str | Path, *, check_output: bool = True) -> dic
     if check_output and (not hepmc_path.is_file() or hepmc_path.stat().st_size <= 0):
         raise RuntimeError(f"expected HepMC output missing or empty: {hepmc_path}")
 
-    return {
+    result = {
         "sample": manifest["sample"],
         "run_dir": str(run_dir),
         "hepmc": str(hepmc_path),
         "stdout": str(stdout_path),
     }
+    if geometry_path is not None:
+        _verify_geometry(geometry_path, hepmc_path, manifest["sample"], run_id, step)
+        seal_geometry(geometry_path, hepmc_path)
+        result["geometry"] = str(geometry_path)
+    return result
 
 
 def run_manifests(paths: Iterable[str | Path], *, check_output: bool = True) -> list[dict]:

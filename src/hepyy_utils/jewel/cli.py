@@ -36,6 +36,8 @@ def _cs_options(command):
 
 
 def _prepare_options(command):
+    command = click.option("--geometry-step-fm", type=click.FloatRange(min=0.0, min_open=True), default=0.02, show_default=True, help="Maximum time step (fm/c) for geometry path integration.")(command)
+    command = click.option("--geometry", is_flag=True, help="Export production points and reference path lengths; requires a rebuilt custom JEWEL binary.")(command)
     command = click.option("--template-dir", type=click.Path(file_okay=False), default=None, help="Directory with JEWEL template .dat files.")(command)
     command = click.option("--vacuum-bin", default="jewel-2.6.0-vac", show_default=True, help="Vacuum JEWEL executable.")(command)
     command = click.option("--medium-bin", default="jewel-2.6.0-simple", show_default=True, help="Medium JEWEL executable.")(command)
@@ -95,6 +97,7 @@ def run(run_path: str, samples: str, no_output_check: bool) -> None:
 @click.option("--ghost-status", type=int, default=3, show_default=True, help="HepMC status used for JEWEL thermal ghosts.")
 @click.option("--progress/--no-progress", default=True, show_default=True, help="Show a tqdm conversion progress bar.")
 @click.option("--event-info/--no-event-info", default=True, show_default=True, help="Write the event_info tree.")
+@click.option("--geometry", type=click.Path(exists=True, dir_okay=False), default=None, help="Geometry CSV; otherwise discover <input>.geometry.csv automatically.")
 @_cs_options
 def convert(
     input_hepmc: str,
@@ -110,6 +113,7 @@ def convert(
     leftovers: str,
     thermal_pid: str,
     seed: int,
+    geometry: str | None,
 ) -> None:
     """Convert HepMC to ROOT track TTrees using uproot."""
 
@@ -127,6 +131,7 @@ def convert(
         leftovers=leftovers,
         thermal_pid=thermal_pid,
         seed=seed,
+        geometry=geometry,
     )
     click.echo(f"converted {result['events']} events, {result['tracks']} tracks")
     click.echo(f"  output: {result['output']}")
@@ -187,7 +192,16 @@ def pipeline(
 @click.option("--seed", type=int, default=0, show_default=True, help="Seed for the random --thermal-pid modes.")
 @click.option("--chunk", type=int, default=5000, show_default=True, help="Events per write.")
 @click.option("--double", is_flag=True, help="float64 momenta (JEWEL writes 6 digits).")
-def tables(inputs, outdir, fmt, particles, dRmax, thermal_pid, seed, chunk, double) -> None:
+@click.option("--geometry", type=click.Path(exists=True, dir_okay=False), default=None, help="Geometry CSV for one input; otherwise discover <input>.geometry.csv automatically.")
+@click.option("--jets", is_flag=True, help="Cluster anti-kt jets and match them to geometry legs (requires fastjet).")
+@click.option("--jet-radius", type=click.FloatRange(min=0.0, min_open=True), default=0.4, show_default=True)
+@click.option("--jet-ptmin", type=click.FloatRange(min=0.0), default=20.0, show_default=True,
+              help="Minimum jet pT in GeV for analysis selection after matching.")
+@click.option("--jet-eta-max", type=click.FloatRange(min=0.0, min_open=True), default=2.0, show_default=True,
+              help="Maximum absolute jet pseudorapidity for analysis selection after matching.")
+@click.option("--match-delta-r", type=click.FloatRange(min=0.0, min_open=True), default=0.3, show_default=True)
+def tables(inputs, outdir, fmt, particles, dRmax, thermal_pid, seed, chunk, double,
+           geometry, jets, jet_radius, jet_ptmin, jet_eta_max, match_delta_r) -> None:
     """Convert JEWEL HepMC to flat events/particles tables (parquet and/or ROOT).
 
     The particles are subtracted with the reference constituent subtraction and keep every tag,
@@ -199,6 +213,8 @@ def tables(inputs, outdir, fmt, particles, dRmax, thermal_pid, seed, chunk, doub
     convert_hepmc_to_tables(
         inputs, outdir, format=fmt, particles=particles, dRmax=dRmax, thermal_pid=thermal_pid,
         seed=seed, chunk=chunk, double=double,
+        geometry=geometry, jets=jets, jet_radius=jet_radius, jet_ptmin=jet_ptmin,
+        jet_eta_max=jet_eta_max, match_delta_r=match_delta_r,
     )
 
 

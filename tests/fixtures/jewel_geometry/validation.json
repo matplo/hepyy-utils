@@ -1,0 +1,54 @@
+{
+  "recipe_sha256": "b5509383cd94cd09c4b8a5811c45b924288861f1c1ac19a07b78b4c8ec9e3067",
+  "compiler": "GNU Fortran (Homebrew GCC 16.2.0) 16.2.0",
+  "cases": {
+    "vac": {
+      "events": 3,
+      "hepmc_sha256": "63530baf86ac2b83b32c6babe5717bee0d669d868edc9fda465b4c1d393b7a9a",
+      "rng_sha256": "b3fbd13ffb77d25e65655649c3a198990afd455701c49fe5f852315cb0e0fb3b",
+      "unchanged": true
+    },
+    "simple": {
+      "events": 1,
+      "hepmc_sha256": "876438c908a7b1c83c809418c70e18c171b1bbb41371bcedb9e4d02751b881c1",
+      "rng_sha256": "7ab8443f670663756ab7b2f70de21c9c66bcfca240ed3c7c54c1d505446b0352",
+      "unchanged": true
+    },
+    "perf-vac": {
+      "events": 3,
+      "hepmc_sha256": "63530baf86ac2b83b32c6babe5717bee0d669d868edc9fda465b4c1d393b7a9a",
+      "rng_sha256": "b3fbd13ffb77d25e65655649c3a198990afd455701c49fe5f852315cb0e0fb3b",
+      "unchanged": true
+    },
+    "perf-simple": {
+      "events": 1,
+      "hepmc_sha256": "876438c908a7b1c83c809418c70e18c171b1bbb41371bcedb9e4d02751b881c1",
+      "rng_sha256": "7ab8443f670663756ab7b2f70de21c9c66bcfca240ed3c7c54c1d505446b0352",
+      "unchanged": true
+    },
+    "recoils": {
+      "events": 1,
+      "hepmc_sha256": "8d184363bd569ef3b76ae684c7d224035f9beaf97669e8119b060c1413cad597",
+      "rng_sha256": "87a242029523c4abfc68c13bd04ca277fc826dff64aa74afab5711278eb058d7",
+      "unchanged": true
+    },
+    "long": {
+      "events": 1,
+      "hepmc_sha256": "04857f0f0642ad6bde4c1fdb1211453695d16d4f90673dea8d78287c7267fc31",
+      "rng_sha256": "7ab8443f670663756ab7b2f70de21c9c66bcfca240ed3c7c54c1d505446b0352",
+      "unchanged": true
+    },
+    "isospin": {
+      "events": 7,
+      "hepmc_sha256": "211199ad18c36037e3556a89eeb8b614a62a0fb5a26efe51caedfc21fcb894a0",
+      "rng_sha256": "ab7beb6b7151e32a2782829697d0229db43ff8c15afe119a29fb9a595a183b16",
+      "unchanged": true
+    }
+  },
+  "step_halving_max_L_hot_difference_fm": 0.015087701621892435,
+  "existing_sidecar_preserves_hepmc": true,
+  "limitations": [
+    "Small diagnostic samples, not statistical physics validation.",
+    "Unmodified prior custom binary and new geometry-disabled binary both stall after one accepted event for NEVENT=3, NJOB=902 with the medium card. Weighted recoil seeds 901/902 also stalled with export disabled; seed 903 is used in the reference fixture."
+  ]
+}

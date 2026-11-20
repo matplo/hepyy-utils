@@ -76,6 +76,8 @@ class RootBuffers:
     parton_py: list[float] = field(default_factory=list)
     parton_pz: list[float] = field(default_factory=list)
     parton_energy: list[float] = field(default_factory=list)
+    geometry_rows: list[dict] = field(default_factory=list)
+    geometry_events: list[dict] = field(default_factory=list)
 
 
 def const_subtraction_event(parts: np.ndarray, ghosts: np.ndarray) -> list[tuple[float, float, float, float, int, int]]:
@@ -314,12 +316,15 @@ def _write_root(
         "energy": np.asarray(buffers.energy, dtype=np.float64),
         "tag": column(buffers.tag, ntrk, -1, np.int8),
     }
+    geometry_meta = (settings or {}).get("geometry")
+    if geometry_meta:
+        tracks["run_id"] = np.full(ntrk, geometry_meta["run_id"])
     with uproot.recreate(output_path) as root_file:
         root_file["tracks"] = tracks
         if settings is not None:
             root_file["jewel_cs"] = json.dumps(settings)
         if buffers.parton_event_id:
-            root_file["partons"] = {
+            partons = {
                 "eventID": np.asarray(buffers.parton_event_id, dtype=np.int64),
                 "pid": np.asarray(buffers.parton_pid, dtype=np.int32),
                 "px": np.asarray(buffers.parton_px, dtype=np.float64),
@@ -327,8 +332,23 @@ def _write_root(
                 "pz": np.asarray(buffers.parton_pz, dtype=np.float64),
                 "energy": np.asarray(buffers.parton_energy, dtype=np.float64),
             }
+            if geometry_meta:
+                partons["run_id"] = np.full(len(buffers.parton_event_id), geometry_meta["run_id"])
+            root_file["partons"] = partons
+        if buffers.geometry_rows:
+            from .geometry import INT_FIELDS
+
+            cols = {
+                key: np.asarray([row[key] for row in buffers.geometry_rows],
+                                dtype=str if key == "run_id" else
+                                np.int64 if key in INT_FIELDS or key == "eventID" else np.float64)
+                for key in buffers.geometry_rows[0]
+            }
+            root_file.mktree("geometry", {key: "string" if values.dtype.kind == "U" else values.dtype
+                                         for key, values in cols.items()})
+            root_file["geometry"].extend(cols)
         if write_event_info:
-            root_file["event_info"] = {
+            info = {
                 "eventID": np.asarray(buffers.info_event_id, dtype=np.int64),
                 "weight": np.asarray(buffers.weight, dtype=np.float64),
                 "xsec": np.asarray(buffers.xsec, dtype=np.float64),
@@ -337,6 +357,13 @@ def _write_root(
                 "beam2_pid": column(buffers.beam2_pid, nev, 0, np.int32),
                 "cs_left_pt": column(buffers.cs_left_pt, nev, math.nan, np.float64),
             }
+            if geometry_meta:
+                from .geometry import EVENT_FIELDS
+
+                info["run_id"] = np.full(nev, geometry_meta["run_id"])
+                for key in EVENT_FIELDS:
+                    info[key] = np.asarray([row[key] for row in buffers.geometry_events], dtype=np.float64)
+            root_file["event_info"] = info
 
 
 def convert_hepmc_to_root(
@@ -354,6 +381,7 @@ def convert_hepmc_to_root(
     leftovers: str = "keep",
     thermal_pid: str = "reference",
     seed: int = 0,
+    geometry: str | Path | None = None,
 ) -> dict:
     """Convert HepMC events to ROOT track TTrees using uproot.
 
@@ -377,6 +405,21 @@ def convert_hepmc_to_root(
     if not input_path.is_file():
         raise FileNotFoundError(f"HepMC input not found: {input_path}")
 
+    from .geometry import open_geometry, resolve_geometry_path, verify_geometry_digest
+
+    geometry_path = resolve_geometry_path(input_path, geometry)
+    geometry_meta, geometry_by_event = None, {}
+    if geometry_path is not None:
+        from .tables import iter_events_with_geometry
+
+        # Validate the whole join before creating a ROOT file, including when
+        # max_events limits the converted prefix. Only the small leg records
+        # are retained; the HepMC particle arrays are streamed and discarded.
+        with open_geometry(geometry_path) as (geometry_meta, records):
+            verify_geometry_digest(input_path, geometry_meta)
+            for header, _particles, legs in iter_events_with_geometry(str(input_path), records):
+                geometry_by_event[int(header["event_id"])] = legs
+
     buffers = RootBuffers()
     event_count = 0
     rng = np.random.default_rng([int(seed), zlib.crc32(input_path.name.encode())])
@@ -388,6 +431,13 @@ def convert_hepmc_to_root(
         for event in iterator:
             if max_events is not None and event_count >= max_events:
                 break
+            if geometry_meta is not None:
+                legs = geometry_by_event[int(event.event_number)]
+                buffers.geometry_events.append(legs[0])
+                buffers.geometry_rows.extend(
+                    row | {"eventID": event_count, "run_id": geometry_meta["run_id"]}
+                    for row in legs
+                )
             if write_event_info:
                 _append_event_info(buffers, event_count, event)
             _append_partons(buffers, event_count, event)
@@ -412,6 +462,8 @@ def convert_hepmc_to_root(
         "thermal_pid": thermal_pid if subtract_4mom and cs_mode == "reference" else None,
         "seed": int(seed),
     }
+    if geometry_meta is not None:
+        settings["geometry"] = geometry_meta
     _write_root(output_root_file, buffers, write_event_info=write_event_info, settings=settings)
     return {
         "input": str(input_path),
