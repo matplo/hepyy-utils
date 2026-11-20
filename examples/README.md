@@ -16,9 +16,9 @@ From the `hepyy-utils` checkout, install the analysis dependencies:
 python -m pip install -e '.[parquet]' matplotlib jupyterlab
 ```
 
-The `.[jets]` extra provides the standalone SWIG FastJet binding and is not
-needed by these examples. Start a fresh Python process or notebook kernel;
-load hepyy FastJet before importing `fastjet`.
+These examples use native C++ FastJet through cppyy. Start a fresh Python
+process or notebook kernel and call `hepyy.load("fastjet")` before importing
+`fastjet`.
 
 ## Run the Python example
 
