@@ -380,10 +380,18 @@ pair known to come from the same run. IDs and weights alone cannot detect
 every accidentally swapped file, especially in long HepMC without status-23
 records.
 
-Parquet output requires `pyarrow`. Jet clustering supports native FastJet
-loaded with `hepyy.load("fastjet")`, as demonstrated in the examples, or the
-standalone `fastjet` Python package. For the standalone binding, install both
-extras from a source checkout with `python -m pip install '.[parquet,jets]'`.
+Parquet output requires `pyarrow`. Jet clustering uses native FastJet through
+hepyy/cppyy. Install the Python extras from a source checkout with
+`python -m pip install -e '.[parquet,jets]'`; `jets` installs hepyy. Set up a
+working cppyy runtime following the [hepyy installation guide](https://github.com/matplo/hepyy#installation),
+then run `hepyy install fastjet`. Both `jewel_tables --jets` and the Python API
+call `hepyy.load("fastjet")` automatically. Conversion without jet finding does
+not load hepyy or the C++ runtime.
+
+If an older `jets` installation left the standalone `fastjet` Python package
+in this environment, remove it with `python -m pip uninstall fastjet` and
+restart Python or the notebook kernel. It is no longer a supported backend
+and can prevent hepyy from exposing its native FastJet module.
 
 ```bash
 jewel_tables outputs/jewel_events/geometry/jewel_med/events/*.hepmc \
@@ -664,7 +672,8 @@ Options:
   --geometry FILE                 Geometry CSV for one input; otherwise
                                   discover <input>.geometry.csv automatically.
   --jets                          Cluster anti-kt jets and match them to
-                                  geometry legs (requires fastjet).
+                                  geometry legs (loads FastJet through
+                                  hepyy/cppyy).
   --jet-radius FLOAT RANGE        [default: 0.4; x>0.0]
   --jet-ptmin FLOAT RANGE         Minimum jet pT in GeV.  [default: 20.0;
                                   x>=0.0]

@@ -3,7 +3,7 @@
 
 Run from an environment with working hepyy/cppyy and installed FastJet:
     hepyy install fastjet
-    python -m pip install -e '.[parquet]' matplotlib
+    python -m pip install -e '.[parquet,jets]' matplotlib
     python examples/jewel_geometry_analysis.py --fixture
 
 Without input arguments, use the completed local medium sample if present,
@@ -22,22 +22,13 @@ import csv
 import glob
 import json
 from pathlib import Path
-import sys
 
 
 def load_hepyy_fastjet():
-    """Load native FastJet through hepyy, without falling back to pip FastJet."""
-    existing = sys.modules.get("fastjet")
-    if existing is not None and not hasattr(existing, "gbl"):
-        raise RuntimeError("Standalone FastJet is already imported. Restart Python/the kernel, "
-                           "then call hepyy.load('fastjet') before importing fastjet.")
-    import hepyy
+    """Use the same native FastJet loader as jewel_tables."""
+    from hepyy_utils.fastjet import require_fastjet
 
-    hepyy.load("fastjet")
-    import fastjet
-
-    if not hasattr(fastjet, "gbl") or fastjet.PseudoJet is not fastjet.gbl.fastjet.PseudoJet:
-        raise RuntimeError("This example requires the native FastJet namespace loaded by hepyy.")
+    fastjet = require_fastjet()
     return {"loader": "hepyy.load('fastjet')", "binding": "cppyy",
             "fastjet_version": str(fastjet.fastjet_version_string())}
 

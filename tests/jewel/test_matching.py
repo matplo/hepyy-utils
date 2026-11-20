@@ -1,7 +1,10 @@
 import math
+import sys
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
+from hepyy_utils.fastjet import require_fastjet
 from hepyy_utils.jewel.matching import cluster_final_jets, match_hard_legs
 
 
@@ -72,8 +75,95 @@ def test_matching_wraps_phi_and_respects_distance_threshold():
     assert not match_hard_legs(legs, [])[0]["matched"]
 
 
-def test_cluster_anti_kt_jets_are_ranked_and_matchable():
-    pytest.importorskip("fastjet")
+def test_require_fastjet_loads_cppyy_backend_once(monkeypatch):
+    monkeypatch.delitem(sys.modules, "fastjet", raising=False)
+    fastjet = ModuleType("fastjet")
+    fastjet.PseudoJet = type("PseudoJet", (), {})
+    fastjet.gbl = SimpleNamespace(fastjet=SimpleNamespace(PseudoJet=fastjet.PseudoJet))
+    hepyy = ModuleType("hepyy")
+    calls = []
+
+    def load(name):
+        calls.append(name)
+        monkeypatch.setitem(sys.modules, name, fastjet)
+
+    hepyy.load = load
+    monkeypatch.setitem(sys.modules, "hepyy", hepyy)
+
+    assert require_fastjet() is fastjet
+    assert require_fastjet() is fastjet
+    assert calls == ["fastjet"]
+
+
+def test_require_fastjet_explains_missing_hepyy(monkeypatch):
+    monkeypatch.delitem(sys.modules, "fastjet", raising=False)
+    monkeypatch.setitem(sys.modules, "hepyy", None)
+
+    with pytest.raises(RuntimeError, match="hepyy install fastjet") as caught:
+        require_fastjet()
+
+    assert "pip install" in str(caught.value)
+    assert isinstance(caught.value.__cause__, ImportError)
+
+
+def test_require_fastjet_preserves_native_load_failure(monkeypatch):
+    monkeypatch.delitem(sys.modules, "fastjet", raising=False)
+    hepyy = ModuleType("hepyy")
+    failure = OSError("cannot open libfastjet")
+
+    def load(name):
+        assert name == "fastjet"
+        raise failure
+
+    hepyy.load = load
+    monkeypatch.setitem(sys.modules, "hepyy", hepyy)
+
+    with pytest.raises(RuntimeError, match="hepyy install fastjet") as caught:
+        require_fastjet()
+
+    assert caught.value.__cause__ is failure
+
+
+def test_require_fastjet_does_not_import_standalone_binding_if_proxy_is_missing(monkeypatch, tmp_path):
+    monkeypatch.delitem(sys.modules, "fastjet", raising=False)
+    (tmp_path / "fastjet.py").write_text('raise AssertionError("Standalone binding was imported")\n')
+    monkeypatch.syspath_prepend(str(tmp_path))
+    hepyy = ModuleType("hepyy")
+
+    def load(name):
+        assert name == "fastjet"
+
+    hepyy.load = load
+    monkeypatch.setitem(sys.modules, "hepyy", hepyy)
+
+    with pytest.raises(RuntimeError, match=r"(?i)restart"):
+        require_fastjet()
+
+    assert "fastjet" not in sys.modules
+
+
+@pytest.mark.parametrize("has_cppyy_namespace", [False, True])
+def test_require_fastjet_rejects_preloaded_non_native_binding(monkeypatch, has_cppyy_namespace):
+    fastjet = ModuleType("fastjet")
+    fastjet.PseudoJet = type("PseudoJet", (), {})
+    if has_cppyy_namespace:
+        fastjet.gbl = SimpleNamespace(fastjet=SimpleNamespace(PseudoJet=object()))
+    monkeypatch.setitem(sys.modules, "fastjet", fastjet)
+    hepyy = ModuleType("hepyy")
+
+    def load(name):
+        pytest.fail(f"Loaded native {name} while an incompatible binding was present")
+
+    hepyy.load = load
+    monkeypatch.setitem(sys.modules, "hepyy", hepyy)
+
+    with pytest.raises(RuntimeError, match=r"(?i)restart"):
+        require_fastjet()
+
+    assert sys.modules["fastjet"] is fastjet
+
+
+def test_cluster_anti_kt_jets_are_ranked_and_matchable(native_fastjet):
     jets = cluster_final_jets([10, 5, -20, 0], [0, 0.2, 0, 1], [0] * 4,
                              [10, math.hypot(5, 0.2), 20, 1], radius=0.4, min_pt=5)
 

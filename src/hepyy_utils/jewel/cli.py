@@ -193,7 +193,7 @@ def pipeline(
 @click.option("--chunk", type=int, default=5000, show_default=True, help="Events per write.")
 @click.option("--double", is_flag=True, help="float64 momenta (JEWEL writes 6 digits).")
 @click.option("--geometry", type=click.Path(exists=True, dir_okay=False), default=None, help="Geometry CSV for one input; otherwise discover <input>.geometry.csv automatically.")
-@click.option("--jets", is_flag=True, help="Cluster anti-kt jets and match them to geometry legs (requires fastjet).")
+@click.option("--jets", is_flag=True, help="Cluster anti-kt jets and match them to geometry legs (loads FastJet through hepyy/cppyy).")
 @click.option("--jet-radius", type=click.FloatRange(min=0.0, min_open=True), default=0.4, show_default=True)
 @click.option("--jet-ptmin", type=click.FloatRange(min=0.0), default=20.0, show_default=True,
               help="Minimum jet pT in GeV for analysis selection after matching.")

@@ -1,11 +1,16 @@
 import gzip
 import hashlib
 import json
+import subprocess
+import sys
+from importlib import reload
 
 import pytest
+from click.testing import CliRunner
 
 from hepyy_utils.jewel import geometry
 from hepyy_utils.jewel.geometry import FIELDS, hepmc_digest, open_geometry, seal_geometry, verify_geometry_digest
+from hepyy_utils.jewel.matching import match_hard_legs
 from hepyy_utils.jewel.tables import convert_hepmc_to_tables
 
 
@@ -210,8 +215,7 @@ def test_rejects_sidecar_identity_mismatch(tmp_path, key, value, error):
         convert_hepmc_to_tables([hepmc], tmp_path / "out", geometry=sidecar)
 
 
-def test_jet_tables_join_to_geometry_and_filter_raw_constituents(tmp_path):
-    pytest.importorskip("fastjet")
+def test_jet_tables_join_to_geometry_and_filter_raw_constituents(tmp_path, native_fastjet):
     pq = pytest.importorskip("pyarrow.parquet")
     hepmc = tmp_path / "run.hepmc.gz"
     sidecar = tmp_path / "run.hepmc.geometry.csv"
@@ -240,8 +244,58 @@ def test_rejects_output_name_collision_before_writing(tmp_path):
     assert not out.exists()
 
 
-def test_jet_tables_include_empty_collection_and_unmatched_legs(tmp_path):
-    pytest.importorskip("fastjet")
+def test_tables_without_jets_does_not_load_native_dependencies(tmp_path, monkeypatch):
+    class BlockJetImports:
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname in {"hepyy", "cppyy", "fastjet"}:
+                pytest.fail(f"Unexpected import of {fullname}")
+
+    for name in ("hepyy", "cppyy", "fastjet"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setattr(sys, "meta_path", [BlockJetImports(), *sys.meta_path])
+
+    from hepyy_utils import fastjet
+    from hepyy_utils.jewel.cli import tables
+
+    reload(fastjet)  # Exercise the helper's import even when pytest has already collected it.
+    hepmc = tmp_path / "run.hepmc.gz"
+    _write_hepmc(hepmc, (3,))
+    _write_geometry(tmp_path / "run.hepmc.geometry.csv", _legs(3))
+
+    assert match_hard_legs([{"leg_id": 1, "eta": 0, "phi": 0}], [])[0]["matched"] is False
+    result = CliRunner().invoke(
+        tables, [str(hepmc), "--outdir", str(tmp_path), "--particles", "raw", "--format", "root"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "run.root").is_file()
+
+
+def test_tables_cli_loads_native_fastjet(tmp_path, native_fastjet):
+    uproot = pytest.importorskip("uproot")
+    hepmc = tmp_path / "run.hepmc.gz"
+    _write_hepmc(hepmc, (3,))
+    _write_geometry(tmp_path / "run.hepmc.geometry.csv", _legs(3))
+
+    result = subprocess.run(
+        [sys.executable, "-c", """
+import sys
+
+from hepyy_utils.jewel.cli import tables_main
+
+assert "fastjet" not in sys.modules
+tables_main()
+""", str(hepmc), "--outdir", str(tmp_path), "--particles", "raw", "--format", "root", "--jets"],
+        capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    with uproot.open(tmp_path / "run.root") as root:
+        assert root["jets"]["pt"].array(library="np").tolist() == [26.0]
+        assert root["jet_matches"]["matched"].array(library="np").tolist() == [True, False]
+
+
+def test_jet_tables_include_empty_collection_and_unmatched_legs(tmp_path, native_fastjet):
     uproot = pytest.importorskip("uproot")
     pa = pytest.importorskip("pyarrow")
     pq = pytest.importorskip("pyarrow.parquet")
@@ -263,8 +317,7 @@ def test_jet_tables_include_empty_collection_and_unmatched_legs(tmp_path):
 
 
 @pytest.mark.parametrize("analysis_cuts", [{"jet_ptmin": 30}, {"jet_eta_max": 0.15}])
-def test_matching_precedes_analysis_cuts(tmp_path, analysis_cuts):
-    pytest.importorskip("fastjet")
+def test_matching_precedes_analysis_cuts(tmp_path, analysis_cuts, native_fastjet):
     uproot = pytest.importorskip("uproot")
     pq = pytest.importorskip("pyarrow.parquet")
     hepmc = tmp_path / "run.hepmc.gz"

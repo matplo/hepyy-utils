@@ -330,7 +330,7 @@ def convert_hepmc_to_tables(inputs, outdir=".", *, format="parquet", particles="
             raise ValueError("jet_radius, jet_eta_max and match_delta_r must be positive and finite")
         if not math.isfinite(jet_ptmin) or jet_ptmin < 0:
             raise ValueError("jet_ptmin must be finite and nonnegative")
-        from .matching import require_fastjet
+        from ..fastjet import require_fastjet
 
         require_fastjet()
     os.makedirs(outdir, exist_ok=True)
