@@ -317,6 +317,50 @@ Both converters then write the partons: `jewel_convert` as a `partons` tree
 events table gets `pthat` and `n_partons`. Readers that select status 1, 3 and 4
 (Rivet, both converters) are unaffected by the extra records.
 
+### HDF5 output
+
+`jewel_tables --format h5` writes one `<stem>.h5` per input. Install `h5py`
+separately or use `python -m pip install 'hepyy-utils[h5]'`. Similarly,
+Parquet needs `pyarrow` (or `hepyy-utils[parquet]`), not the package named
+`parquet`. These extras are optional dependency shortcuts.
+
+```bash
+jewel_tables events.hepmc.gz --outdir tables --format h5 --particles both --jets
+```
+
+Use `--format all` to write HDF5, ROOT and Parquet together. `--format both`
+keeps its existing meaning: ROOT plus Parquet. HDF5-only output does not
+require pyarrow. Jet finding still uses the FastJet supplied by hepyy and
+requires a geometry sidecar, just as with the other output formats.
+
+Each HDF5 table is a group (`events`, `particles`, `particles_raw`, `partons`,
+`geometry`, `jets_all`, `jets`, `jet_matches`, as applicable), with one
+one-dimensional, gzip-compressed dataset per column. Rows within a group
+share their index; tables retain the existing event/run/leg/jet join keys.
+Numeric precision follows `--double`, IDs stay integers, flags stay booleans,
+and run IDs are UTF-8 strings. Writes append chunks, so the file need not be
+held in memory. Empty jet tables retain their columns.
+
+The root attribute `jewel_cs` contains the same JSON analysis metadata as
+ROOT and Parquet; `schema` is `hepyy_utils.jewel.tables.v1`. Read with h5py:
+
+```python
+import json
+import h5py
+
+with h5py.File("tables/events.h5", "r") as data:
+    metadata = json.loads(data.attrs["jewel_cs"])
+    event_ids = data["events/event_id"][:]
+    production_x = data["geometry/x0_fm"][:]
+    lengths = data["geometry/L_hot_fm"][:]
+    run_ids = data["geometry/run_id"].asstr()[:]
+    matched = data["jet_matches/matched"][:]
+```
+
+This is a columnar HDF5 layout, not a pandas/PyTables store. Read the groups
+with h5py and construct a DataFrame if needed. As for the other formats,
+rerunning conversion replaces the corresponding derived output files.
+
 ### Production points, path lengths, and jet matching
 
 Runnable [Python and notebook examples](examples/README.md) show the full
@@ -650,14 +694,16 @@ Options:
 ```text
 Usage: python -m hepyy_utils.jewel.cli tables [OPTIONS] INPUTS...
 
-  Convert JEWEL HepMC to flat events/particles tables (parquet and/or ROOT).
+  Convert JEWEL HepMC to flat tables in Parquet, ROOT or HDF5.
 
   The particles are subtracted with the reference constituent subtraction and
   keep every tag, so the leftover convention is chosen at analysis time.
 
 Options:
   --outdir DIRECTORY              Output directory.  [default: .]
-  --format [parquet|root|both]    [default: parquet]
+  --format [parquet|root|both|h5|all]
+                                  both: Parquet and ROOT; all: Parquet, ROOT
+                                  and HDF5.  [default: parquet]
   --particles [cs|raw|both]       Subtracted particles, the raw record, or
                                   both.  [default: cs]
   --dRmax FLOAT                   Maximum particle-thermal distance in (y,

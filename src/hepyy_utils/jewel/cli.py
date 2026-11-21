@@ -185,7 +185,8 @@ def pipeline(
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("inputs", nargs=-1, required=True, type=click.Path(exists=True, dir_okay=False))
 @click.option("--outdir", default=".", show_default=True, type=click.Path(file_okay=False), help="Output directory.")
-@click.option("--format", "fmt", type=click.Choice(["parquet", "root", "both"]), default="parquet", show_default=True)
+@click.option("--format", "fmt", type=click.Choice(["parquet", "root", "both", "h5", "all"]), default="parquet", show_default=True,
+              help="both: Parquet and ROOT; all: Parquet, ROOT and HDF5.")
 @click.option("--particles", type=click.Choice(["cs", "raw", "both"]), default="cs", show_default=True, help="Subtracted particles, the raw record, or both.")
 @click.option("--dRmax", "dRmax", type=float, default=0.5, show_default=True, help="Maximum particle-thermal distance in (y, phi).")
 @click.option("--thermal-pid", type=click.Choice(THERMAL_PID_MODES), default="reference", show_default=True, help="PDG id of leftover thermal momenta (tags 2, 3).")
@@ -202,7 +203,7 @@ def pipeline(
 @click.option("--match-delta-r", type=click.FloatRange(min=0.0, min_open=True), default=0.3, show_default=True)
 def tables(inputs, outdir, fmt, particles, dRmax, thermal_pid, seed, chunk, double,
            geometry, jets, jet_radius, jet_ptmin, jet_eta_max, match_delta_r) -> None:
-    """Convert JEWEL HepMC to flat events/particles tables (parquet and/or ROOT).
+    """Convert JEWEL HepMC to flat tables in Parquet, ROOT or HDF5.
 
     The particles are subtracted with the reference constituent subtraction and keep every tag,
     so the leftover convention is chosen at analysis time.
