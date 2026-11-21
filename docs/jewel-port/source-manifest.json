@@ -1,0 +1,42 @@
+{
+  "jewel-2.6.0.f": {
+    "sha256": "78b39f19513c3633c00d45b22f0803c0873a93d98a536d66efc9277255bf5b81",
+    "lines": 9697,
+    "read_name": "jewel-2.6.0.f.stock"
+  },
+  "medium-simple.f": {
+    "sha256": "a5f5a16d984cf84d28c2c789f72557a64b85cb6ae51bc9f395b1f2a7f4e2bd38",
+    "lines": 829,
+    "read_name": "medium-simple.f.stock"
+  },
+  "medium-vac.f": {
+    "sha256": "c83fda6a0b81ce0dc9f524bbf9a3c68f0225f090107a5cd4d6711edad0b20ea0",
+    "lines": 214,
+    "read_name": "medium-vac.f.stock"
+  },
+  "meix.f": {
+    "sha256": "a3c069469578ae216ff5c6333cb4781e099af6f48b3c9a912c1f5d6b3c70f817",
+    "lines": 38,
+    "read_name": "meix.f"
+  },
+  "pythia6425mod-lhapdf6.f": {
+    "sha256": "9fcfed664e4ac34462aa63679f2dd3e935c9f6f63f7cd6a785b73ccb82740ed9",
+    "lines": 80918,
+    "read_name": "pythia6425mod-lhapdf6.f"
+  },
+  "subtraction.C": {
+    "sha256": "5b84552df996799d9e1061d85fdddf9ee3add56aacc2e4a4655f8e7943d82d17",
+    "lines": 216,
+    "read_name": "subtraction.C"
+  },
+  "release_note-2.6.0.txt": {
+    "sha256": "7ef6667672ead30ddc3da2b55ff94ad8a064150c29f04b360ecf7e6898648005",
+    "lines": 94,
+    "read_name": "release_note-2.6.0.txt"
+  },
+  "Makefile": {
+    "sha256": "bb32b2bac3fa7560c9843f2d5dd4380c47b552297d03babed999dfc8dad5869e",
+    "lines": 24,
+    "read_name": "Makefile"
+  }
+}
