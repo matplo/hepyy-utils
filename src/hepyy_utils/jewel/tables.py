@@ -1,5 +1,5 @@
 """
-JEWEL HepMC2 (.hepmc / .hepmc.gz) -> flat tables in parquet and/or ROOT.
+JEWEL HepMC2 (.hepmc / .hepmc.gz) -> flat tables in Parquet, ROOT or HDF5.
 
 Per input file <stem>.hepmc[.gz] it writes (rows in event order, join on event_id):
   events         one row per event: event_id, ievent, weight, pthat, xsec_pb, xsec_err_pb, the other
@@ -17,14 +17,16 @@ Per input file <stem>.hepmc[.gz] it writes (rows in event order, join on event_i
   jets           subset of jets_all passing the analysis pT and pseudorapidity cuts.
   jet_matches    optional shower-start leg to jets_all assignments, keyed like geometry.
 Parquet: <stem>.events.parquet, <stem>.particles.parquet, ...  ROOT: <stem>.root with one TTree per table.
+HDF5: <stem>.h5 with one group per table and one resizable dataset per column.
 
-  jewel_tables run*.hepmc.gz [--format parquet|root|both] [--particles cs|raw|both]
+  jewel_tables run*.hepmc.gz [--format parquet|root|both|h5|all] [--particles cs|raw|both]
                          [--dRmax 0.5] [--thermal-pid reference|intended|cast] [--seed 0]
                          [--chunk 5000] [--outdir .] [--double] [--geometry FILE] [--jets]
 
 --thermal-pid: PDG id of leftover thermal momenta (tags 2, 3); see subtraction.py. Random modes are
 reproducible: one generator per input file, seeded from (--seed, file name).
-The settings are stored with the output (parquet metadata key 'jewel_cs'; TObjString 'jewel_cs').
+The settings are stored with the output (Parquet metadata key 'jewel_cs'; ROOT TObjString
+'jewel_cs'; HDF5 root attribute 'jewel_cs'). 'both' means Parquet + ROOT; 'all' adds HDF5.
 
 pthat: taken from the HepMC event scale (E line). Stock JEWEL writes 0 there (stored as NaN);
 JEWEL patched with patch_jewel_partons.py writes PARI(17).
@@ -133,14 +135,15 @@ def iter_events_with_geometry(path, geometry_events):
 
 
 class Tables:
-    """Chunked writer: parquet (pyarrow) and/or ROOT (uproot), one table/TTree per name."""
+    """Chunked Parquet, ROOT and HDF5 writer, with the same columns in each format."""
 
     def __init__(self, stem, fmt, meta):
         self.stem, self.fmt, self.pq, self.root, self.trees = stem, fmt, {}, None, set()
+        self.h5 = None
         self.meta = json.dumps(meta)
 
     def write(self, name, cols):
-        if self.fmt in ("parquet", "both"):
+        if self.fmt in ("parquet", "both", "all"):
             import pyarrow as pa
             import pyarrow.parquet as pq
             table = pa.table(cols).replace_schema_metadata({"jewel_cs": self.meta})
@@ -148,7 +151,7 @@ class Tables:
                 self.pq[name] = pq.ParquetWriter(f"{self.stem}.{name}.parquet", table.schema,
                                                  compression="zstd")
             self.pq[name].write_table(table)
-        if self.fmt in ("root", "both"):
+        if self.fmt in ("root", "both", "all"):
             import uproot
             if self.root is None:
                 self.root = uproot.recreate(f"{self.stem}.root")
@@ -159,12 +162,34 @@ class Tables:
                 self.trees.add(name)
             if len(next(iter(cols.values()))):
                 self.root[name].extend(cols)
+        if self.fmt in ("h5", "all"):
+            import h5py
+            if self.h5 is None:
+                self.h5 = h5py.File(f"{self.stem}.h5", "w")
+                self.h5.attrs["jewel_cs"] = self.meta
+                self.h5.attrs["schema"] = "hepyy_utils.jewel.tables.v1"
+            group = self.h5.require_group(name)
+            for key, values in cols.items():
+                strings = values.dtype.kind == "U"
+                if key not in group:
+                    group.create_dataset(
+                        key, shape=(0,), maxshape=(None,), chunks=True,
+                        dtype=h5py.string_dtype("utf-8") if strings else values.dtype,
+                        compression="gzip", shuffle=not strings,
+                    )
+                dataset = group[key]
+                start = len(dataset)
+                dataset.resize((start + len(values),))
+                if len(values):
+                    dataset[start:] = values.astype(object) if strings else values
 
     def close(self):
         for w in self.pq.values():
             w.close()
         if self.root is not None:
             self.root.close()
+        if self.h5 is not None:
+            self.h5.close()
 
 
 def _columns(rows, ints, strings=(), bools=(), *, fields=None):
@@ -310,8 +335,13 @@ def convert_hepmc_to_tables(inputs, outdir=".", *, format="parquet", particles="
 
     from types import SimpleNamespace
 
-    if format not in ("parquet", "root", "both"):
-        raise ValueError(f"format must be parquet, root or both, not {format!r}")
+    if format not in ("parquet", "root", "both", "h5", "all"):
+        raise ValueError(f"format must be parquet, root, both, h5 or all, not {format!r}")
+    if format in ("h5", "all"):
+        try:
+            import h5py
+        except ImportError as exc:
+            raise RuntimeError("HDF5 output requires h5py: install h5py or hepyy-utils[h5].") from exc
     if particles not in ("cs", "raw", "both"):
         raise ValueError(f"particles must be cs, raw or both, not {particles!r}")
     if thermal_pid not in subtraction.THERMAL_PID_MODES:
