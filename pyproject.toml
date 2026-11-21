@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pandas"]
 parquet = ["pyarrow"]
 h5 = ["h5py"]
 jets = ["hepyy"]
