@@ -728,6 +728,13 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
+## Standalone C++ JEWEL port planning
+
+The [JEWEL 2.6.0 source inventory and C++ porting plan](docs/jewel-port/README.md)
+maps every core/medium routine to a proposed component, identifies direct
+Pythia6 dependencies and their Pythia8 replacements, and defines staged
+validation gates. It is a design document; the C++ generator is not yet implemented.
+
 ## Development
 
 ```bash
