@@ -1,0 +1,5 @@
+include README.md
+recursive-include examples *.py *.ipynb *.md
+recursive-include docs *.md *.csv *.json
+recursive-include tests *.py *.md *.json *.txt *.dat *.csv *.gz
+recursive-include tools *.py
