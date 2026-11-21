@@ -1,0 +1,76 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/publish.yml"
+      - "pyproject.toml"
+      - "MANIFEST.in"
+      - "src/hepyy_utils/__init__.py"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install release and test dependencies
+        run: python -m pip install build twine '.[test,parquet,h5]'
+      - name: Verify package and tag versions
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          import hepyy_utils
+          with open('pyproject.toml', 'rb') as stream:
+              version = tomllib.load(stream)['project']['version']
+          assert hepyy_utils.__version__ == version
+          if os.environ['GITHUB_REF'].startswith('refs/tags/'):
+              assert os.environ['GITHUB_REF_NAME'] == 'v' + version
+          PY
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Validate distribution metadata
+        run: python -m twine check --strict dist/*
+      - name: Check wheel installation and HDF5 CLI
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          cd /tmp
+          python - <<'PY'
+          from importlib.metadata import metadata
+          from hepyy_utils.fastjet import require_fastjet
+          from hepyy_utils import __version__
+          info = metadata('hepyy-utils')
+          assert info['Version'] == __version__
+          assert not any(r.lower().startswith('fastjet') for r in info.get_all('Requires-Dist'))
+          PY
+          jewel_tables "$GITHUB_WORKSPACE/tests/fixtures/jewel_geometry/simple/events.hepmc.gz" --format h5 --particles raw --outdir /tmp/jewel-release-smoke
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/hepyy-utils/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

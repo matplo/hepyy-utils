@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hepyy-utils"
-version = "0.1.0"
+version = "0.3.0"
 description = "Workflow utilities for hepyy-installed HEP event generators and tools."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,11 +19,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pandas"]
 parquet = ["pyarrow"]
 h5 = ["h5py"]
 jets = ["hepyy"]
 fast = ["numba"]
+
+[project.urls]
+Homepage = "https://github.com/matplo/hepyy-utils"
+Repository = "https://github.com/matplo/hepyy-utils"
+Issues = "https://github.com/matplo/hepyy-utils/issues"
 
 [project.scripts]
 jewel_prepare = "hepyy_utils.jewel.cli:prepare_main"
